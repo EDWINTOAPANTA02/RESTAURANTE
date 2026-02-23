@@ -1,0 +1,1 @@
+[2026-02-23 05:47:55] BLOQUEO RBAC: Usuario en sesión: Ninguno | Rol detectado: N/A | Roles permitidos: ADMINISTRADOR
