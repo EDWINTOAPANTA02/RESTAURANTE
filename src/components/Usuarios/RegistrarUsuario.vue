@@ -41,7 +41,7 @@ export default ({
             this.usuario = usuario
             HttpService.registrar(this.usuario, "registrar_usuario.php")
             .then(registrado => {
-                if(registrado) {
+                if(registrado && registrado.resultado) {
                     this.usuario = {
                          correo: "",
                         nombre: "",
@@ -52,8 +52,13 @@ export default ({
                         message: 'Usuario registrado. Recuerda que la contraseña por defecto es PacoHunterDev',
                         type: 'is-success'
                     })
-                    this.cargando = false
+                } else {
+                    this.$buefy.toast.open({
+                        message: registrado ? registrado.error : 'Error al registrar usuario',
+                        type: 'is-danger'
+                    })
                 }
+                this.cargando = false
             })
         }
     }

@@ -35,7 +35,7 @@ export default {
             this.cargando = true
             HttpService.registrar(this.insumo, "registrar_insumo.php")
             .then(registrado => {
-                if(registrado) {
+                if(registrado && registrado.resultado) {
                     this.insumo = {
                         tipo: "",
                         codigo: "",
@@ -48,8 +48,13 @@ export default {
                         message: 'Insumo registrado',
                         type: 'is-success'
                     })
-                    this.cargando = false
+                } else {
+                    this.$buefy.toast.open({
+                        message: registrado ? registrado.error : 'Error al registrar insumo',
+                        type: 'is-danger'
+                    })
                 }
+                this.cargando = false
             })
         }
     }

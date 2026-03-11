@@ -4,7 +4,8 @@ if (!$usuario_p)
 	exit("No se encontraron datos");
 include_once "encabezado.php";
 include_once "funciones.php";
-$respuesta = iniciarSesion($usuario_p->correo, $usuario_p->password);
+$ruc = isset($usuario_p->ruc) ? $usuario_p->ruc : null;
+$respuesta = iniciarSesion($ruc, $usuario_p->correo, $usuario_p->password);
 
 if ($respuesta) {
 	comenzarSesionSegura();
@@ -13,7 +14,8 @@ if ($respuesta) {
 	$usuario_datos = [
 		"nombreUsuario" => $respuesta->nombre,
 		"idUsuario" => $respuesta->id,
-		"rol" => $respuesta->rol
+		"rol" => $respuesta->rol,
+		"empresaId" => $respuesta->empresa_id
 	];
 
 	// Verificar si tiene el password por defecto (ajustar según sea necesario)
@@ -26,5 +28,5 @@ if ($respuesta) {
 	echo json_encode(["resultado" => true, "datos" => $usuario_datos]);
 }
 else {
-	echo json_encode(["resultado" => false]);
+	echo json_encode(["resultado" => false, "error" => "Correo o contraseña incorrectos"]);
 }

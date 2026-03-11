@@ -19,6 +19,13 @@
                     <img src="@/assets/logo_principal.png" alt="" height="150" width="150" style="display: block; margin:0 auto;">
                     <p class="title is-3 has-text-centered"></p>
                     <b-field>
+                        <b-input placeholder="RUC o Código de Empresa"
+                            icon="domain"
+                            v-model="ruc">
+                        </b-input>
+                    </b-field>
+
+                    <b-field>
                         <b-input placeholder="Correo electrónico"
                             type="email"
                             icon="email"
@@ -52,6 +59,7 @@ export default {
     name: "Login",
 
     data: () => ({
+        ruc: "",
         correo: "", 
         password: "",
         cargando:false
@@ -59,6 +67,13 @@ export default {
 
     methods: {
         ingresar(){
+            if(!this.ruc) {
+                this.$buefy.toast.open({
+                    message: 'Debes colocar el RUC o código de empresa',
+                    type: 'is-warning'
+                })
+                return
+            }
             if(!this.correo) {
                 this.$buefy.toast.open({
                     message: 'Debes colocar el correo',
@@ -75,19 +90,28 @@ export default {
             }
             this.cargando = true
             let payload = {
+                ruc: this.ruc,
                 correo: this.correo,
                 password: this.password
             }
 
             HttpService.obtenerConDatos(payload, "iniciar_sesion.php")
             .then(log => {
+                this.cargando = false
+                if (!log) {
+                    this.$buefy.toast.open({
+                        message: 'Error de comunicación con el servidor',
+                        type: 'is-danger'
+                    })
+                    return
+                }
+
                 if(log.resultado === "cambia"){
                    this.$buefy.toast.open({
                         message: 'Datos correctos. Debes cambiar tu contraseña',
                         type: 'is-info'
                     })
                     this.$emit("logeado", log)
-                    this.cargando = false
                     return 
                 }
 
@@ -97,14 +121,20 @@ export default {
                         type: 'is-success'
                     })
                     this.$emit("logeado", log)
-                    this.cargando = false
                 } else {
                     this.$buefy.toast.open({
-                        message: 'Datos incorrectos. Verifica tu información',
+                        message: log.error || 'Datos incorrectos. Verifica tu información',
                         type: 'is-danger'
                     })
-                    this.cargando = false
                 }
+            })
+            .catch(e => {
+                this.cargando = false
+                console.error(e)
+                this.$buefy.toast.open({
+                    message: 'Ocurrió un error al intentar iniciar sesión',
+                    type: 'is-danger'
+                })
             })
             
         }

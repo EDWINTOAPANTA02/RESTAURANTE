@@ -21,7 +21,7 @@
                 Insumos
             </b-navbar-item>
 
-            <b-navbar-item tag="router-link" :to="{ path: '/realizar-orden' }">
+            <b-navbar-item tag="router-link" :to="{ path: '/realizar-orden' }" v-if="!esSuperAdmin">
                 <b-icon icon="order-bool-ascending-variant"></b-icon>
                 <span></span>
                 Ordenar
@@ -55,6 +55,12 @@
                 <b-icon icon="application-cog-outline"></b-icon>
                 <span></span>
                 Configurar
+            </b-navbar-item>
+
+            <b-navbar-item tag="router-link" :to="{ path: '/empresas' }" v-if="esSuperAdmin">
+                <b-icon icon="domain"></b-icon>
+                <span></span>
+                Empresas SaaS
             </b-navbar-item>
         </template>
 
@@ -90,6 +96,9 @@ export default ({
         logo: null
     }),
     computed: {
+        esSuperAdmin() {
+            return this.rol === 'SUPERADMIN'
+        },
         esAdmin() {
             return this.rol === 'ADMINISTRADOR'
         },

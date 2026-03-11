@@ -19,7 +19,7 @@ function requireTenant(): object
 
     $bd = conectarBaseDatos();
     $stmt = $bd->prepare(
-        "SELECT id, razon_social, plan, estado, ambiente
+        "SELECT id, razon_social, plan, estado, ambiente, fecha_vencimiento
          FROM empresas
          WHERE id = ?
          LIMIT 1"
@@ -41,34 +41,18 @@ function requireTenant(): object
         exit;
     }
 
+    // Validar vencimiento (ignorar para SuperAdmin)
+    if ($usuario->rol !== 'SUPERADMIN' && !empty($empresa->fecha_vencimiento)) {
+        $hoy = date('Y-m-d');
+        if ($empresa->fecha_vencimiento < $hoy) {
+            http_response_code(403);
+            echo json_encode([
+                'error' => 'Tu suscripción expiró el ' . $empresa->fecha_vencimiento . '. Por favor, realiza tu pago mensual para continuar.',
+                'expirado' => true
+            ]);
+            exit;
+        }
+    }
+
     return $empresa;
-}
-
-/**
- * Devuelve el empresa_id del usuario en sesión.
- * Uso: $eid = getEmpresaId();
- */
-function getEmpresaId(): int
-{
-    $usuario = $_SESSION['usuario'] ?? null;
-    if (!$usuario || empty($usuario->empresa_id)) {
-        http_response_code(401);
-        echo json_encode(['error' => 'Sin sesión activa.']);
-        exit;
-    }
-    return (int)$usuario->empresa_id;
-}
-
-/**
- * Devuelve el usuario_id del usuario en sesión.
- */
-function getUsuarioId(): int
-{
-    $usuario = $_SESSION['usuario'] ?? null;
-    if (!$usuario || empty($usuario->id)) {
-        http_response_code(401);
-        echo json_encode(['error' => 'Sin sesión activa.']);
-        exit;
-    }
-    return (int)$usuario->id;
 }

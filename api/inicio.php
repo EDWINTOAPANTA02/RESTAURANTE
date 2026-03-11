@@ -1,6 +1,9 @@
 <?php
 include_once "encabezado.php";
 include_once "funciones.php";
+include_once "middleware/Auth.php";
+
+requireAuth();
 
 $filtros = json_decode(file_get_contents("php://input"));
 
@@ -18,20 +21,20 @@ $insumosMasVendidos = obtenerInsumosMasVendidos($filtros->limite);
 $totalesPorMesa = obtenerTotalesPorMesa();
 
 $cartas = [
-    "totalVentasDia" =>  obtenerVentasDelDia(),
-    "numeroUsuarios" =>  obtenerNumeroUsuarios(),
-    "numeroInsumos" =>  obtenerNumeroInsumos(),
-    "totalVentas" =>  obtenerTotalVentas(),
-    "numeroMesasOcupadas" =>  obtenerNumeroMesasOcupadas(),
-    ];
+    "totalVentasDia" => obtenerVentasDelDia(),
+    "numeroUsuarios" => obtenerNumeroUsuarios(),
+    "numeroInsumos" => obtenerNumeroInsumos(),
+    "totalVentas" => obtenerTotalVentas(),
+    "numeroMesasOcupadas" => obtenerNumeroMesasOcupadas(),
+];
 
 echo json_encode(
-	[
-		"ventasDiasSemana" => $ventasDiasSemana,
-        "ventasHora" => $ventasPorHora,
-        "ventasMeses" => $ventasMeses,
-        "ventasUsuario" => $ventasUsuario,
-        "insumosMasVendidos" => $insumosMasVendidos,
-        "totalesPorMesa" => $totalesPorMesa,
-        "cartas" => $cartas
-	]);
+[
+    "ventasDiasSemana" => $ventasDiasSemana,
+    "ventasHora" => $ventasPorHora,
+    "ventasMeses" => $ventasMeses,
+    "ventasUsuario" => $ventasUsuario,
+    "insumosMasVendidos" => $insumosMasVendidos,
+    "totalesPorMesa" => $totalesPorMesa,
+    "cartas" => $cartas
+]);

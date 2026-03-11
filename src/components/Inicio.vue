@@ -1,7 +1,7 @@
 <template>
     <section>
         <br>
-        <div class="tile is-ancestor">
+        <div class="tile is-ancestor" v-if="!esSuperAdmin">
             <div class="tile is-parent" v-for="(carta, index) in cartas"  :key="index">
                 <div class="card is-card-widget tile is-child">
                     <div class="card-header">
@@ -213,10 +213,20 @@
         </div>
         </template>
 
-        <div v-if="!esAdmin" class="box has-text-centered" style="margin-top:2rem;">
+        <div v-if="!esAdmin && !esSuperAdmin" class="box has-text-centered" style="margin-top:2rem;">
             <b-icon icon="account-check" size="is-large" type="is-primary"></b-icon>
             <p class="title is-4 has-text-grey" style="margin-top:1rem;">Bienvenido al sistema</p>
             <p class="subtitle is-6 has-text-grey-light">Desde aquí puedes gestionar las mesas y órdenes del restaurante.</p>
+        </div>
+
+        <div v-if="esSuperAdmin" class="box has-text-centered" style="margin-top:2rem;">
+            <b-icon icon="domain" size="is-large" type="is-link"></b-icon>
+            <p class="title is-4 has-text-grey" style="margin-top:1rem;">Panel Super Administrador</p>
+            <p class="subtitle is-6 has-text-grey-light">Desde este panel puedes administrar los clientes de tu SaaS.</p>
+            <br>
+            <b-button type="is-primary" tag="router-link" to="/empresas" size="is-large" icon-left="domain">
+              Gestionar Empresas
+            </b-button>
         </div>
 
         <b-loading :is-full-page="true" v-model="cargando" :can-cancel="false"></b-loading>
@@ -259,6 +269,7 @@ export default ({
     }),
 
     computed: {
+        esSuperAdmin() { return this.rol === 'SUPERADMIN' },
         esAdmin() { return this.rol === 'ADMINISTRADOR' },
         esCajero() { return this.rol === 'CAJERO' },
         esMesero() { return this.rol === 'MESERO' }
@@ -317,16 +328,28 @@ export default ({
         }, 
 
         obtenerDatos(){
+            if (this.esSuperAdmin) {
+                this.cargando = false
+                return
+            }
             this.cargando = true
             HttpService.obtenerConDatos(this.filtros, "inicio.php")
             .then(resultado => { 
-                this.ventasSemana = Utiles.cambiarDiaSemana(resultado.ventasDiasSemana)
-                this.ventasHora = resultado.ventasHora
-                this.ventasMeses = Utiles.cambiarNumeroANombreMes(resultado.ventasMeses)
-                this.ventasUsuarios = resultado.ventasUsuario
-                this.resultadoCartas = resultado.cartas
-                this.insumosMasVendidos = this.calcularProgreso(resultado.insumosMasVendidos)
-                this.totalesPorMesa = this.calcularProgreso(resultado.totalesPorMesa)
+                this.cargando = false
+                if (!resultado || resultado.error) {
+                    this.$buefy.toast.open({
+                        message: 'No se pudo cargar el dashboard: ' + (resultado ? resultado.error : 'Error desconocido'),
+                        type: 'is-danger'
+                    })
+                    return
+                }
+                this.ventasSemana = Utiles.cambiarDiaSemana(resultado.ventasDiasSemana || [])
+                this.ventasHora = resultado.ventasHora || []
+                this.ventasMeses = Utiles.cambiarNumeroANombreMes(resultado.ventasMeses || [])
+                this.ventasUsuarios = resultado.ventasUsuario || []
+                this.resultadoCartas = resultado.cartas || {}
+                this.insumosMasVendidos = this.calcularProgreso(resultado.insumosMasVendidos || [])
+                this.totalesPorMesa = this.calcularProgreso(resultado.totalesPorMesa || [])
                 
                 this.totalVentasHora = Utiles.calcularTotales(this.ventasHora)
                 this.totalVentasSemana = Utiles.calcularTotales(this.ventasSemana)
@@ -343,7 +366,7 @@ export default ({
                     {
                         encabezado: "Ventas del día",
                         titulo: "Ventas hoy",
-                        total: "$" + this.resultadoCartas.totalVentasDia,
+                        total: "$" + (this.resultadoCartas.totalVentasDia || 0),
                         icono: "cart-outline",
                         colorTexto: "has-text-info",
                         ruta: "/reporte-ventas",
@@ -352,7 +375,7 @@ export default ({
                     {
                         encabezado: "Estado mesas",
                         titulo: "Mesas ocupadas",
-                        total: this.resultadoCartas.numeroMesasOcupadas,
+                        total: this.resultadoCartas.numeroMesasOcupadas || 0,
                         icono: "table-furniture",
                         colorTexto: "has-text-success",
                         ruta: "/realizar-orden",
@@ -361,7 +384,7 @@ export default ({
                     {
                         encabezado: "Usuarios registrados",
                         titulo: "Usuarios",
-                        total: this.resultadoCartas.numeroUsuarios,
+                        total: this.resultadoCartas.numeroUsuarios || 0,
                         icono: "account",
                         colorTexto: "has-text-danger",
                         ruta: "/usuarios",
@@ -370,7 +393,7 @@ export default ({
                     {
                         encabezado: "Insumos registrados",
                         titulo: "Insumos",
-                        total: this.resultadoCartas.numeroInsumos,
+                        total: this.resultadoCartas.numeroInsumos || 0,
                         icono: "food-fork-drink",
                         colorTexto: "has-text-warning",
                         ruta: "/insumos",
@@ -379,7 +402,7 @@ export default ({
                     {
                         encabezado: "Total ventas",
                         titulo: "Ventas",
-                        total: "$" + this.resultadoCartas.totalVentas,
+                        total: "$" + (this.resultadoCartas.totalVentas || 0),
                         icono: "cart-outline",
                         colorTexto: "has-text-primary",
                         ruta: "/reporte-ventas",
@@ -387,7 +410,14 @@ export default ({
                     },
                 ]
                 this.cartas = todasLasCartas.filter(c => c.roles.includes(this.rol))
-                 this.cargando = false
+            })
+            .catch(e => {
+                this.cargando = false
+                console.error(e)
+                this.$buefy.toast.open({
+                    message: 'Error fatal al cargar el dashboard',
+                    type: 'is-danger'
+                })
             })
         },
 

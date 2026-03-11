@@ -18,7 +18,7 @@
                 class="has-background-success is-pulled-right has-text-white"
                 style="font-size:3.5em; padding: 10px"
             >
-                Total ${{ totalVentas }}
+                Total ${{ parseFloat(totalVentas).toFixed(2) }}
             </span>
         </p>
       </div>
@@ -92,7 +92,7 @@
         >
           <b-taglist attached>
             <b-tag size="is-large">{{ usuario.nombre }}</b-tag>
-            <b-tag size="is-large" type="is-info">${{ usuario.total }}</b-tag>
+            <b-tag size="is-large" type="is-info">${{ parseFloat(usuario.total).toFixed(2) }}</b-tag>
           </b-taglist>
         </div>
       </b-field>
@@ -160,15 +160,15 @@
       </b-table-column>
 
       <b-table-column field="pagado" label="Pago" v-slot="props">
-        ${{ props.row.pagado }}
+        ${{ parseFloat(props.row.pagado).toFixed(2) }}
       </b-table-column>
 
       <b-table-column field="cambio" label="Cambio" sortable v-slot="props">
-        ${{ props.row.pagado - props.row.total }}
+        ${{ parseFloat(props.row.pagado - props.row.total).toFixed(2) }}
       </b-table-column>
 
       <b-table-column field="total" label="Total" sortable v-slot="props">
-        <strong>${{ props.row.total }}</strong>
+        <strong>${{ parseFloat(props.row.total).toFixed(2) }}</strong>
       </b-table-column>
 
       <b-table-column field="insumos" label="Insumos" v-slot="props">
@@ -180,10 +180,10 @@
             {{ props.row.nombre }}
           </b-table-column>
           <b-table-column field="cantidad" label="Cantidad" v-slot="props">
-            {{ props.row.cantidad }} X ${{ props.row.precio }}
+            {{ props.row.cantidad }} X ${{ parseFloat(props.row.precio).toFixed(2) }}
           </b-table-column>
           <b-table-column field="subtotal" label="Subtotal" v-slot="props">
-            ${{ props.row.cantidad * props.row.precio }}
+            ${{ parseFloat(props.row.cantidad * props.row.precio).toFixed(2) }}
           </b-table-column>
         </b-table>
       </b-table-column>

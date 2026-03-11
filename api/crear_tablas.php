@@ -11,87 +11,109 @@ $crear_bd = "CREATE DATABASE IF NOT EXISTS botanero_ventas";
 
 
 $sentencias = [
-	["tabla"=>"categorias",
-	"sentencia" => 
-		'CREATE TABLE categorias(
-            id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-            tipo ENUM("PLATILLO", "BEBIDA") NOT NULL,
-            nombre VARCHAR(50) NOT NULL,
-            descripcion VARCHAR(255)
-	);'],
+      ["tabla" => "categorias",
+            "sentencia" =>
+            'CREATE TABLE IF NOT EXISTS categorias(
+            id INT(11) NOT NULL AUTO_INCREMENT,
+            empresa_id BIGINT UNSIGNED NOT NULL,
+            tipo ENUM("PLATILLO", "BEBIDA") NOT NULL DEFAULT "PLATILLO",
+            nombre VARCHAR(100) NOT NULL,
+            descripcion VARCHAR(255),
+            PRIMARY KEY (id),
+            KEY empresa_id (empresa_id)
+  	);'],
 
 
-	["tabla"=>"insumos",
-		"sentencia" =>
-		'CREATE TABLE insumos(
-            id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+      ["tabla" => "insumos",
+            "sentencia" =>
+            'CREATE TABLE IF NOT EXISTS insumos(
+            id INT(11) NOT NULL AUTO_INCREMENT,
+            empresa_id BIGINT UNSIGNED NOT NULL,
             codigo VARCHAR(100) NOT NULL,
             nombre VARCHAR(100) NOT NULL,
             descripcion VARCHAR(255) NOT NULL,
-            precio DECIMAL(6,2) NOT NULL,
+            precio DECIMAL(10,2) NOT NULL,
             tipo ENUM("PLATILLO", "BEBIDA") NOT NULL,
-            categoria BIGINT UNSIGNED NOT NULL
-		);'],
+            categoria INT(11) NOT NULL,
+            PRIMARY KEY (id),
+            KEY empresa_id (empresa_id)
+  		);'],
 
-	["tabla"=>"informacion_negocio",
-		"sentencia" => 'CREATE TABLE informacion_negocio(
+      ["tabla" => "informacion_negocio",
+            "sentencia" => 'CREATE TABLE IF NOT EXISTS informacion_negocio(
+            id INT(11) NOT NULL AUTO_INCREMENT,
+            empresa_id BIGINT UNSIGNED NOT NULL,
             nombre VARCHAR(100),
-            telefono VARCHAR(15),
-            numeroMesas TINYINT,
-            logo VARCHAR(255)
-		);'],
+            ruc VARCHAR(20),
+            direccion VARCHAR(255),
+            telefono VARCHAR(20),
+            correo VARCHAR(100),
+            mensaje_pie VARCHAR(255),
+            impuesto DECIMAL(5,2) DEFAULT 0.00,
+            logo VARCHAR(255),
+            PRIMARY KEY (id),
+            KEY empresa_id (empresa_id)
+ 		);'],
 
-	["tabla"=>"usuarios",
-		"sentencia" =>
-		'CREATE TABLE usuarios(
-            id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+      ["tabla" => "usuarios",
+            "sentencia" =>
+            'CREATE TABLE IF NOT EXISTS usuarios(
+            id INT(11) NOT NULL AUTO_INCREMENT,
+            empresa_id BIGINT UNSIGNED NOT NULL,
             correo VARCHAR(100) NOT NULL,
             nombre VARCHAR(100) NOT NULL,
             telefono VARCHAR(20) NOT NULL,
-            password VARCHAR(255) NOT NULL
-		);'],
+            password VARCHAR(255) NOT NULL,
+            rol ENUM("SUPERADMIN", "ADMINISTRADOR", "MESERO", "COCINERO") DEFAULT "MESERO",
+            PRIMARY KEY (id),
+            KEY empresa_id (empresa_id)
+ 		);'],
 
-	["tabla"=>"ventas",
-		"sentencia" =>
-		'CREATE TABLE ventas(
-            id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-            idMesa TINYINT NOT NULL,
+      ["tabla" => "ventas",
+            "sentencia" =>
+            'CREATE TABLE IF NOT EXISTS ventas(
+            id INT(11) NOT NULL AUTO_INCREMENT,
+            empresa_id BIGINT UNSIGNED NOT NULL,
+            idMesa INT(11) NOT NULL,
             cliente VARCHAR(100),
             fecha DATETIME NOT NULL,
-            total DECIMAL(6,2) NOT NULL,
-            pagado DECIMAL(6,2) NOT NULL,
-            idUsuario BIGINT UNSIGNED NOT NULL
-		);'],
+            total DECIMAL(10,2) NOT NULL,
+            pagado DECIMAL(10,2) NOT NULL,
+            idUsuario INT(11) NOT NULL,
+            PRIMARY KEY (id),
+            KEY empresa_id (empresa_id)
+ 		);'],
 
-	["tabla"=>"insumos_venta",
-		"sentencia" =>
-		'CREATE TABLE insumos_venta(
-            id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-            idInsumo BIGINT UNSIGNED NOT NULL,
-            precio DECIMAL(6,2) NOT NULL,
+      ["tabla" => "insumos_venta",
+            "sentencia" =>
+            'CREATE TABLE IF NOT EXISTS insumos_venta(
+            id INT(11) NOT NULL AUTO_INCREMENT,
+            idInsumo INT(11) NOT NULL,
+            precio DECIMAL(10,2) NOT NULL,
             cantidad INT NOT NULL,
-            idVenta BIGINT UNSIGNED
-		);']
+            idVenta INT(11),
+            PRIMARY KEY (id)
+ 		);']
 ];
 
-$conexion = new PDO("mysql:host=$host", $usuario, $password);
+$conexion = new PDO("mysql:host=$host;port=3307", $usuario, $password);
 $conexion->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $creada_bd = $conexion->exec($crear_bd);
-if($creada_bd) array_push($resultados, "Base de datos creada correctamente");
+if ($creada_bd)
+      array_push($resultados, "Base de datos creada correctamente");
 $conexion->exec('USE botanero_ventas');
 #Ahora crear las tablas
 //$conexion->close();
 
-$conexion = new PDO("mysql:host=$host;dbname=botanero_ventas", $usuario, $password);
+$conexion = new PDO("mysql:host=$host;port=3307;dbname=botanero_ventas", $usuario, $password);
 $conexion->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 foreach ($sentencias as $sentencia) {
-	$conexion->exec($sentencia["sentencia"]);
+      $conexion->exec($sentencia["sentencia"]);
 
-	array_push($resultados, "Tabla {$sentencia["tabla"]} creada correctamente");
+      array_push($resultados, "Tabla {$sentencia["tabla"]} creada correctamente");
 
 }
 
 $conexion = null;
 echo json_encode($resultados);
-

@@ -1,0 +1,1 @@
+<?php $datos = ["correo" => "prueba@gmail.com", "password" => "prueba123"]; $ch = curl_init("http://localhost/botanero_ventas/api/iniciar_sesion.php"); curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($datos)); curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/json"]); echo curl_exec($ch);

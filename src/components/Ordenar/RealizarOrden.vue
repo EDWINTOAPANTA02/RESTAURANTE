@@ -17,7 +17,7 @@
                 <div class="box">
                     <p class="title is-2 has-text-grey">Mesa #{{ mesa.mesa.idMesa }}
                         <span class="title is-1 has-text-weight-bold is-pulled-right" v-if="mesa.mesa.total">
-                            ${{ mesa.mesa.total }}
+                            ${{ parseFloat(mesa.mesa.total).toFixed(2) }}
                         </span>
                     </p>
                     <p v-if="mesa.mesa.atiende">
@@ -71,11 +71,11 @@
                                     </b-table-column>  
 
                                     <b-table-column field="cantidad" label="Cantidad" v-slot="props">
-                                        {{ props.row.cantidad }} X ${{  props.row.precio }}
+                                        {{ props.row.cantidad }} X ${{  parseFloat(props.row.precio).toFixed(2) }}
                                     </b-table-column>                                        
                                     
                                     <b-table-column field="subtotal" label="Subtotal" v-slot="props">
-                                        ${{ props.row.cantidad * props.row.precio }}
+                                        ${{ parseFloat(props.row.cantidad * props.row.precio).toFixed(2) }}
                                     </b-table-column>                                                                
                                     <b-table-column field="estado" label="" v-slot="props">
                                         <b-icon icon="alert" type="is-danger" v-if="props.row.estado ==='pendiente'"></b-icon>
@@ -109,16 +109,22 @@
         <b-loading :is-full-page="true" v-model="cargando" :can-cancel="false"></b-loading>
         <ticket @impreso="onImpreso" :venta="this.ventaSeleccionada" :insumos="insumosSeleccionados" :datosLocal="datos" :logo="logo" v-if="mostrarTicket"></ticket>
 
+        <ClienteModal v-if="mostrarClienteModal"
+            :mesa="mesaActual"
+            @close="mostrarClienteModal = false"
+            @confirm="confirmarCobro"/>
+
     </section>
 </template>
 <script>
 import HttpService from '../../Servicios/HttpService'
+import ClienteModal from '../Ordenar/ClienteModal.vue'
 import Ticket from '../Ventas/Ticket.vue'
 import Utiles from '../../Servicios/Utiles'
 
 export default ({
     name: "RealizarOrden",
-    components: { Ticket },
+    components: { Ticket, ClienteModal },
 
     data: () => ({
         datos: {},
@@ -130,7 +136,11 @@ export default ({
         cargando: false,
         mostrarTicket: false,
         ventaSeleccionada: {},
-        insumosSeleccionados: []
+        insumosSeleccionados: [],
+        mostrarClienteModal: false,
+        clienteSeleccionado: null,
+        tipoFactura: 'CONSUMIDOR_FINAL',
+        mesaActual: null
     }),
 
     mounted(){
@@ -233,54 +243,49 @@ export default ({
         },
 
         cobrar(mesa){
-            this.$buefy.dialog.prompt({
-                title: `Cobrar a la mesa #` + mesa.mesa.idMesa,
-                message: `El cliente debe pagar $` + mesa.mesa.total,
-                inputAttrs: {
-                    type: 'number',
-                    value:"",
-                    placeholder: 'Escribe la cantidad con la que paga',
-                    min: 1
-                },
-                trapFocus: true,
-                onConfirm: (value) => {
-                    if(parseFloat(value) < parseFloat(mesa.mesa.total)){
-                        this.$buefy.toast.open({
-                            message: 'Escribe una cantidad correcta',
-                            type: 'is-warning'
+            // Calcular el total de la mesa sumando los insumos (ya que el backend retorna total = 0 inicial)
+            let total = 0
+            if(mesa.insumos && mesa.insumos.length > 0){
+                mesa.insumos.forEach(insumo => {
+                    total += (insumo.cantidad * insumo.precio)
+                })
+            }
+            mesa.mesa.total = total
+
+            // Open client selection modal before payment
+            this.clienteSeleccionado = null
+            this.tipoFactura = 'CONSUMIDOR_FINAL'
+            this.mesaActual = mesa
+            this.mostrarClienteModal = true
+        },
+        // Handler called from ClienteModal when user confirms
+        confirmarCobro(payloadCliente){
+            const mesa = this.mesaActual
+            const payload = {
+                idMesa: mesa.mesa.idMesa,
+                cliente_id: payloadCliente.cliente_id,
+                tipo_factura: payloadCliente.tipo_factura,
+                total: mesa.mesa.total,
+                pagado: payloadCliente.pago,
+                idUsuario: mesa.mesa.idUsuario,
+                insumos: mesa.insumos,
+                atiende: mesa.mesa.atiende
+            }
+            this.cargando = true
+            HttpService.registrar(payload, "registrar_venta.php")
+                .then(registrado => {
+                    if(registrado){
+                        const cambio = parseFloat(payloadCliente.pago - mesa.mesa.total).toFixed(2)
+                        this.$buefy.dialog.alert({
+                            title: 'Venta registrada',
+                            message: `Gracias por su compra, su cambio <b>$${cambio}</b>`,
+                            confirmText: 'OK'
                         })
-                        return
+                        this.imprimirComprobante(payload)
+                        this.crearMesas()
                     }
-
-                    this.cargando = true
-                    let cambio = parseFloat(value - mesa.mesa.total)
-
-                    let payload = {
-                        idMesa: mesa.mesa.idMesa,
-                        cliente: mesa.mesa.cliente,
-                        total: mesa.mesa.total,
-                        pagado: value, 
-                        idUsario: mesa.mesa.idUsuario,
-                        insumos: mesa.insumos,
-                        atiende: mesa.mesa.atiende
-                    }
-                    
-                    HttpService.registrar(payload, "registrar_venta.php")
-                    .then(registrado => {
-                        if(registrado){
-                           this.$buefy.dialog.alert({
-                                title: 'Venta registrada',
-                                message: 'Gracias por su compra, su cambio <b>$' + cambio + '</b>',
-                                confirmText: 'OK'
-                            })
-                            this.imprimirComprobante(payload)
-                            this.crearMesas()
-                            this.cargando = false
-                        }
-                    })
-                    
-                }
-            })
+                    this.cargando = false
+                })
         },
 
         crearMesas(){

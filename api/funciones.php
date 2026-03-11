@@ -1,6 +1,8 @@
 <?php
 
 define('DIRECTORIO', './fotos/');
+include_once "middleware/Auth.php";
+include_once "middleware/Tenant.php";
 
 function verificarTablas()
 {
@@ -48,136 +50,164 @@ function obtenerVentasSemanaDeUsuario($idUsuario)
 function obtenerInsumosMasVendidos($limite)
 {
 	$bd = conectarBaseDatos();
+	$eid = getEmpresaId();
 	$sentencia = $bd->prepare("SELECT SUM(insumos_venta.precio * insumos_venta.cantidad ) 
 	AS total, insumos.nombre, insumos.tipo, IFNULL(categorias.nombre, 'NO DEFINIDA') AS categoria 
 	FROM insumos_venta 
 	INNER JOIN insumos ON insumos.id = insumos_venta.idInsumo 
 	LEFT JOIN categorias ON categorias.id = insumos.categoria
+	WHERE insumos.empresa_id = ?
 	GROUP BY insumos_venta.idInsumo 
 	ORDER BY total DESC 
 	LIMIT ?");
-	$sentencia->execute([$limite]);
+	$sentencia->execute([$eid, (int)$limite]);
 	return $sentencia->fetchAll();
 }
 
 function obtenerTotalesPorMesa()
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->query("SELECT SUM(total) AS total, idMesa
-	FROM ventas 
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("SELECT SUM(total) AS total, idMesa
+	FROM ventas WHERE empresa_id = ?
 	GROUP BY idMesa
 	ORDER BY total DESC");
+	$sentencia->execute([$eid]);
 	return $sentencia->fetchAll();
 }
 
 function obtenerVentasDelDia()
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->query("SELECT IFNULL(SUM(total),0) AS totalVentasHoy
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("SELECT IFNULL(SUM(total),0) AS totalVentasHoy
 	FROM ventas
-	WHERE DATE(fecha) = CURDATE()");
+	WHERE empresa_id = ? AND DATE(fecha) = CURDATE()");
+	$sentencia->execute([$eid]);
 	return $sentencia->fetchObject()->totalVentasHoy;
 }
 
 function obtenerNumeroUsuarios()
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->query("SELECT COUNT(*) AS numeroUsuarios
-	FROM usuarios");
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("SELECT COUNT(*) AS numeroUsuarios
+	FROM usuarios WHERE empresa_id = ?");
+	$sentencia->execute([$eid]);
 	return $sentencia->fetchObject()->numeroUsuarios;
 }
 
 function obtenerNumeroInsumos()
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->query("SELECT COUNT(*) AS numeroInsumos
-	FROM insumos");
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("SELECT COUNT(*) AS numeroInsumos
+	FROM insumos WHERE empresa_id = ?");
+	$sentencia->execute([$eid]);
 	return $sentencia->fetchObject()->numeroInsumos;
 }
 
 function obtenerTotalVentas()
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->query("SELECT IFNULL(SUM(total),0) AS totalVentas
-	FROM ventas");
-	return $sentencia->fetchObject()->totalVentas;
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("SELECT IFNULL(SUM(total),0) AS total FROM ventas WHERE empresa_id = ?");
+	$sentencia->execute([$eid]);
+	return $sentencia->fetchObject()->total;
 }
 
 function obtenerNumeroMesasOcupadas()
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->query("SELECT COUNT(*) AS total FROM pedidos WHERE estado = 'ABIERTO'");
-	return $sentencia->fetchObject()->total;
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("SELECT COUNT(DISTINCT idMesa) AS ocupadas FROM pedidos WHERE empresa_id = ? AND estado = 'ABIERTO'");
+	$sentencia->execute([$eid]);
+	return $sentencia->fetchObject()->ocupadas;
 }
 
 function obtenerVentasUsuario($fechaInicio, $fechaFin)
 {
 	$bd = conectarBaseDatos();
+	$eid = getEmpresaId();
 	$sentencia = $bd->prepare("SELECT usuarios.nombre, SUM(ventas.total) AS totalVentas
 	FROM ventas
 	INNER JOIN usuarios ON usuarios.id = ventas.idUsuario
-	WHERE (DATE(fecha) >= ? AND DATE(fecha) <= ?)
+	WHERE ventas.empresa_id = ? AND (DATE(fecha) >= ? AND DATE(fecha) <= ?)
 	GROUP BY ventas.idUsuario");
-	$sentencia->execute([$fechaInicio, $fechaFin]);
+	$sentencia->execute([$eid, $fechaInicio, $fechaFin]);
 	return $sentencia->fetchAll();
 }
 
 function obtenerVentasPorHora($fechaInicio, $fechaFin)
 {
 	$bd = conectarBaseDatos();
+	$eid = getEmpresaId();
 	$sentencia = $bd->prepare("SELECT DATE_FORMAT(fecha,'%H') AS hora, 
    	SUM(total) as totalVentas FROM ventas 
-    WHERE (DATE(fecha) >= ? AND DATE(fecha) <= ?)
+    WHERE empresa_id = ? AND (DATE(fecha) >= ? AND DATE(fecha) <= ?)
     GROUP BY DATE_FORMAT(fecha,'%H') 
     ORDER BY hora ASC
     ");
-	$sentencia->execute([$fechaInicio, $fechaFin]);
+	$sentencia->execute([$eid, $fechaInicio, $fechaFin]);
 	return $sentencia->fetchAll();
 }
 
 function obtenerVentasPorMeses($anio)
 {
 	$bd = conectarBaseDatos();
+	$eid = getEmpresaId();
 	$sentencia = $bd->prepare("SELECT MONTH(fecha) AS mes, SUM(total) AS totalVentas FROM ventas 
-        WHERE YEAR(fecha) = ?
+        WHERE empresa_id = ? AND YEAR(fecha) = ?
         GROUP BY MONTH(fecha) ORDER BY mes ASC");
-	$sentencia->execute([$anio]);
+	$sentencia->execute([$eid, $anio]);
 	return $sentencia->fetchAll();
 }
 
 function obtenerVentasDiasSemana()
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->query("SELECT DAYNAME(fecha) AS dia, DAYOFWEEK(fecha) AS numeroDia, SUM(total) AS totalVentas FROM ventas
-     WHERE YEARWEEK(fecha)=YEARWEEK(CURDATE())
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("SELECT DAYNAME(fecha) AS dia, DAYOFWEEK(fecha) AS numeroDia, SUM(total) AS totalVentas FROM ventas
+     WHERE empresa_id = ? AND YEARWEEK(fecha)=YEARWEEK(CURDATE())
      GROUP BY dia 
      ORDER BY fecha ASC");
+	$sentencia->execute([$eid]);
 	return $sentencia->fetchAll();
-
 }
 
 function obtenerVentasPorUsuario($fechaInicio, $fechaFin)
 {
 	$bd = conectarBaseDatos();
+	$eid = getEmpresaId();
 	$sentencia = $bd->prepare("SELECT IFNULL(SUM(ventas.total), 0) AS total,
 	usuarios.nombre 
 	FROM ventas
 	INNER JOIN usuarios ON usuarios.id = ventas.idUsuario
-	WHERE (DATE(ventas.fecha) >= ? AND DATE(ventas.fecha) <= ?)
+	WHERE ventas.empresa_id = ? AND (DATE(ventas.fecha) >= ? AND DATE(ventas.fecha) <= ?)
 	GROUP BY ventas.idUsuario");
-	$sentencia->execute([$fechaInicio, $fechaFin]);
+	$sentencia->execute([$eid, $fechaInicio, $fechaFin]);
 	return $sentencia->fetchAll();
 }
 
-function obtenerVentas($fechaInicio, $fechaFin, $idUsuario)
+function obtenerVentas($inicio, $fin)
 {
 	$bd = conectarBaseDatos();
-	$valoresAEjecutar = [$fechaInicio, $fechaFin];
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("SELECT ventas.id, ventas.idMesa, ventas.cliente, ventas.fecha, ventas.total, ventas.pagado, usuarios.nombre FROM ventas INNER JOIN usuarios ON usuarios.id = ventas.idUsuario WHERE ventas.empresa_id = ? AND DATE(ventas.fecha) >= ? AND DATE(ventas.fecha) <= ?");
+	$sentencia->execute([$eid, $inicio, $fin]);
+	return $sentencia->fetchAll();
+}
+
+function obtenerVentasConUsuario($fechaInicio, $fechaFin, $idUsuario)
+{
+	$bd = conectarBaseDatos();
+	$eid = getEmpresaId();
+	$valoresAEjecutar = [$eid, $fechaInicio, $fechaFin];
 
 	$sql = "SELECT ventas.*, IFNULL(usuarios.nombre, 'NO ENCONTRADO') AS atendio 
 	FROM ventas
 	LEFT JOIN usuarios ON ventas.idUsuario = usuarios.id
-	WHERE (DATE(ventas.fecha) >= ? AND DATE(ventas.fecha) <= ?)";
+	WHERE ventas.empresa_id = ? AND (DATE(ventas.fecha) >= ? AND DATE(ventas.fecha) <= ?)";
 
 	if ($idUsuario !== "") {
 		$sql .= " AND ventas.idUsuario = ?";
@@ -194,49 +224,58 @@ function obtenerVentas($fechaInicio, $fechaFin, $idUsuario)
 function obtenerInsumosVenta($idVenta)
 {
 	$bd = conectarBaseDatos();
+	$eid = getEmpresaId();
 	$sentencia = $bd->prepare("SELECT insumos_venta.*, insumos.nombre, insumos.codigo
 	 FROM insumos_venta 
 	 LEFT JOIN insumos ON insumos.id = insumos_venta.idInsumo
-	 WHERE idVenta = ?");
-	$sentencia->execute([$idVenta]);
+	 WHERE insumos_venta.idVenta = ? AND insumos_venta.empresa_id = ?");
+	$sentencia->execute([$idVenta, $eid]);
 	return $sentencia->fetchAll();
-
 }
 
 function registrarVenta($venta)
 {
 	$bd = conectarBaseDatos();
+	$eid = getEmpresaId();
 	try {
 		$bd->beginTransaction();
 
+		$cliente_id = isset($venta->cliente_id) ? $venta->cliente_id : null;
+		$cliente_nombre = isset($venta->cliente) ? $venta->cliente : null;
+		$tipo_factura = isset($venta->tipo_factura) ? $venta->tipo_factura : 'CONSUMIDOR_FINAL';
+		$empresa_id = isset($venta->empresa_id) ? $venta->empresa_id : $eid; // Use $eid if not provided
+		$idUsuario = isset($venta->idUsuario) ? $venta->idUsuario : 1;
+
 		// 1. Registrar la venta
-		$sentencia = $bd->prepare("INSERT INTO ventas (idMesa, cliente, fecha, total, pagado, idUsuario) VALUES (?,?,?,?,?,?)");
-		$sentencia->execute([$venta->idMesa, $venta->cliente, date("Y-m-d H:i:s"), $venta->total, $venta->pagado, $venta->idUsuario]);
+		$sentencia = $bd->prepare("INSERT INTO ventas (idMesa, cliente, fecha, total, pagado, idUsuario, cliente_id, tipo_factura, empresa_id) VALUES (?,?,?,?,?,?,?,?,?)");
+		$sentencia->execute([$venta->idMesa, $cliente_nombre, date("Y-m-d H:i:s"), $venta->total, $venta->pagado, $idUsuario, $cliente_id, $tipo_factura, $empresa_id]);
 		$idVenta = $bd->lastInsertId();
 
 		// 2. Registrar los insumos de la venta
-		registrarInsumosVenta($venta->insumos, $idVenta);
+		registrarInsumosVenta($venta->insumos, $idVenta, $empresa_id, $bd);
 
 		// 3. Cerrar el pedido en la base de datos
-		$sentenciaPedido = $bd->prepare("UPDATE pedidos SET estado = 'PAGADO' WHERE idMesa = ? AND estado = 'ABIERTO'");
-		$sentenciaPedido->execute([$venta->idMesa]);
+		$sentenciaPedido = $bd->prepare("UPDATE pedidos SET estado = 'PAGADO' WHERE idMesa = ? AND estado = 'ABIERTO' AND empresa_id = ?");
+		$sentenciaPedido->execute([$venta->idMesa, $empresa_id]);
 
 		$bd->commit();
 		return true;
 	}
 	catch (Exception $e) {
 		$bd->rollBack();
-		return false;
+		return ["error" => $e->getMessage()];
 	}
 }
 
-function registrarInsumosVenta($insumos, $idVenta)
+function registrarInsumosVenta($insumos, $idVenta, $empresa_id = 1, $bd = null)
 {
 	$resultados = [];
-	$bd = conectarBaseDatos();
+	$eid = getEmpresaId();
+	$empresa_id = ($empresa_id === 1) ? $eid : $empresa_id;
+
 	foreach ($insumos as $insumo) {
-		$sentencia = $bd->prepare("INSERT INTO insumos_venta(idInsumo, precio, cantidad, idVenta) VALUES(?,?,?,?)");
-		$sentencia->execute([$insumo->id, $insumo->precio, $insumo->cantidad, $idVenta]);
+		$sentencia = $bd->prepare("INSERT INTO insumos_venta(idInsumo, precio, cantidad, idVenta, empresa_id) VALUES(?,?,?,?,?)");
+		$sentencia->execute([$insumo->id, $insumo->precio, $insumo->cantidad, $idVenta, $empresa_id]);
 		if ($sentencia)
 			array_push($resultados, $sentencia);
 	}
@@ -256,13 +295,14 @@ function obtenerMesas()
 function leerArchivo($numeroMesa)
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->prepare("SELECT p.*, u.nombre as atiende FROM pedidos p LEFT JOIN usuarios u ON p.idUsuario = u.id WHERE p.idMesa = ? AND p.estado = 'ABIERTO'");
-	$sentencia->execute([$numeroMesa]);
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("SELECT p.*, u.nombre as atiende FROM pedidos p LEFT JOIN usuarios u ON p.idUsuario = u.id WHERE p.idMesa = ? AND p.estado = 'ABIERTO' AND p.empresa_id = ?");
+	$sentencia->execute([$numeroMesa, $eid]);
 	$pedido = $sentencia->fetchObject();
 
 	if ($pedido) {
-		$sentenciaDetalles = $bd->prepare("SELECT d.*, i.nombre, i.codigo FROM detalles_pedidos d INNER JOIN insumos i ON d.idInsumo = i.id WHERE d.idPedido = ?");
-		$sentenciaDetalles->execute([$pedido->id]);
+		$sentenciaDetalles = $bd->prepare("SELECT d.*, i.nombre, i.codigo FROM detalles_pedidos d INNER JOIN insumos i ON d.idInsumo = i.id WHERE d.idPedido = ? AND i.empresa_id = ?");
+		$sentenciaDetalles->execute([$pedido->id, $eid]);
 		$detalles = $sentenciaDetalles->fetchAll();
 
 		$insumos = [];
@@ -306,8 +346,9 @@ function leerArchivo($numeroMesa)
 function cancelarMesa($id)
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->prepare("UPDATE pedidos SET estado = 'CANCELADO' WHERE idMesa = ? AND estado = 'ABIERTO'");
-	return $sentencia->execute([$id]);
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("UPDATE pedidos SET estado = 'CANCELADO' WHERE idMesa = ? AND estado = 'ABIERTO' AND empresa_id = ?");
+	return $sentencia->execute([$id, $eid]);
 }
 
 function editarMesa($mesa)
@@ -317,8 +358,9 @@ function editarMesa($mesa)
 		$bd->beginTransaction();
 
 		// 1. Obtener ID del pedido actual
-		$sentenciaPedido = $bd->prepare("SELECT id FROM pedidos WHERE idMesa = ? AND estado = 'ABIERTO'");
-		$sentenciaPedido->execute([$mesa->id]);
+		$eid = getEmpresaId();
+		$sentenciaPedido = $bd->prepare("SELECT id FROM pedidos WHERE idMesa = ? AND estado = 'ABIERTO' AND empresa_id = ?");
+		$sentenciaPedido->execute([$mesa->id, $eid]);
 		$pedido = $sentenciaPedido->fetchObject();
 
 		if ($pedido) {
@@ -345,10 +387,11 @@ function editarMesa($mesa)
 function ocuparMesa($mesa)
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->prepare("INSERT INTO pedidos (idMesa, idUsuario, cliente, fecha_apertura, estado) VALUES (?,?,?,?,?)");
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("INSERT INTO pedidos (idMesa, idUsuario, cliente, fecha_apertura, estado, empresa_id) VALUES (?,?,?,?,?,?)");
 	$cliente = ($mesa->cliente === "") ? "MOSTRADOR" : $mesa->cliente;
 	$fecha = date("Y-m-d H:i:s");
-	$sentencia->execute([$mesa->id, $mesa->idUsuario, $cliente, $fecha, 'ABIERTO']);
+	$sentencia->execute([$mesa->id, $mesa->idUsuario, $cliente, $fecha, 'ABIERTO', $eid]);
 	$idPedido = $bd->lastInsertId();
 
 	foreach ($mesa->insumos as $insumo) {
@@ -386,11 +429,13 @@ function verificarPassword($password, $idUsuario)
 
 }
 
-function iniciarSesion($correo, $password)
+function iniciarSesion($ruc, $correo, $password)
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->prepare("SELECT * FROM usuarios WHERE correo = ?");
-	$sentencia->execute([$correo]);
+	$sentencia = $bd->prepare("SELECT u.* FROM usuarios u 
+                               INNER JOIN empresas e ON e.id = u.empresa_id
+                               WHERE e.ruc = ? AND u.correo = ?");
+	$sentencia->execute([$ruc, $correo]);
 	$usuario = $sentencia->fetchObject();
 	if ($usuario === FALSE)
 		return false;
@@ -416,32 +461,95 @@ function eliminarUsuario($idUsuario)
 function editarUsuario($usuario)
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->prepare("UPDATE usuarios SET correo = ?, nombre = ?, telefono = ?, rol = ? WHERE id = ?");
-	return $sentencia->execute([$usuario->correo, $usuario->nombre, $usuario->telefono, $usuario->rol, $usuario->id]);
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("UPDATE usuarios SET correo = ?, nombre = ?, telefono = ?, rol = ? WHERE id = ? AND empresa_id = ?");
+	return $sentencia->execute([$usuario->correo, $usuario->nombre, $usuario->telefono, $usuario->rol, $usuario->id, $eid]);
 }
 
 function obtenerUsuarioPorId($idUsuario)
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->prepare("SELECT id, correo, nombre, telefono FROM usuarios WHERE id = ?");
-	$sentencia->execute([$idUsuario]);
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("SELECT id, correo, nombre, telefono FROM usuarios WHERE id = ? AND empresa_id = ?");
+	$sentencia->execute([$idUsuario, $eid]);
 	return $sentencia->fetchObject();
 }
 
 function obtenerUsuarios()
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->query("SELECT id, correo, nombre, telefono FROM usuarios");
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("SELECT id, correo, nombre, telefono, rol FROM usuarios WHERE empresa_id = ?");
+	$sentencia->execute([$eid]);
 	return $sentencia->fetchAll();
+}
+
+function getLimitesPorPlan($plan)
+{
+	if ($plan === 'BASICO') {
+		return ['usuarios' => 5, 'insumos' => 50, 'mesas' => 10];
+	}
+	if ($plan === 'PRO') {
+		return ['usuarios' => 15, 'insumos' => 300, 'mesas' => 30];
+	}
+	return ['usuarios' => 9999, 'insumos' => 9999, 'mesas' => 999]; // PREMIUM
+}
+
+function getEmpresaId(): int
+{
+	comenzarSesionSegura();
+	$usuario = $_SESSION['usuario'] ?? null;
+	if (!$usuario || empty($usuario->empresa_id)) {
+		http_response_code(401);
+		echo json_encode(['error' => 'Sin sesión activa (eid).']);
+		exit;
+	}
+	return (int)$usuario->empresa_id;
+}
+
+function getUsuarioId(): int
+{
+	comenzarSesionSegura();
+	$usuario = $_SESSION['usuario'] ?? null;
+	if (!$usuario || empty($usuario->id)) {
+		http_response_code(401);
+		echo json_encode(['error' => 'Sin sesión activa (uid).']);
+		exit;
+	}
+	return (int)$usuario->id;
 }
 
 function registrarUsuario($usuario)
 {
-	$bd = conectarBaseDatos();
-	$rol = isset($usuario->rol) ? $usuario->rol : 'MESERO';
-	$sentencia = $bd->prepare("INSERT INTO usuarios (correo, nombre, telefono, password, rol) VALUES(?,?,?,?,?)");
-	return $sentencia->execute([$usuario->correo, $usuario->nombre, $usuario->telefono, $usuario->password, $rol]);
+	try {
+		$bd = conectarBaseDatos();
+		$empresa = requireTenant();
+		$eid = $empresa->id;
 
+		// Validar límites del plan
+		$limites = getLimitesPorPlan($empresa->plan);
+		$stmtCount = $bd->prepare("SELECT COUNT(*) FROM usuarios WHERE empresa_id = ?");
+		$stmtCount->execute([$eid]);
+		$totalActual = $stmtCount->fetchColumn();
+
+		if ($totalActual >= $limites['usuarios']) {
+			return ["resultado" => false, "error" => "Has alcanzado el límite de usuarios de tu plan (" . $limites['usuarios'] . ")"];
+		}
+
+		$rol = isset($usuario->rol) ? $usuario->rol : 'MESERO';
+		$sentencia = $bd->prepare("INSERT INTO usuarios (empresa_id, correo, nombre, telefono, password, rol) VALUES(?,?,?,?,?,?)");
+		$exito = $sentencia->execute([$eid, $usuario->correo, $usuario->nombre, $usuario->telefono, $usuario->password, $rol]);
+		return ["resultado" => $exito];
+	}
+	catch (PDOException $e) {
+		if ($e->getCode() == 23000 || str_contains($e->getMessage(), '1062')) {
+			return ["resultado" => false, "error" => "Este correo ya está registrado en el sistema."];
+		}
+		return ["resultado" => false, "error" => "Error de base de datos: " . $e->getMessage()];
+	}
+	catch (Exception $e) {
+		return ["resultado" => false, "error" => $e->getMessage()];
+	}
 }
 
 function comenzarSesionSegura()
@@ -495,32 +603,81 @@ function verificarRol($rolesPermitidos)
 function obtenerInsumosPorNombre($insumo)
 {
 	$bd = conectarBaseDatos();
+	$eid = getEmpresaId();
 	$sentencia = $bd->prepare("SELECT insumos.*, IFNULL(categorias.nombre, 'NO DEFINIDA') AS categoria
 	FROM insumos
 	LEFT JOIN categorias ON categorias.id = insumos.categoria 
-	WHERE insumos.nombre LIKE ? ");
-	$sentencia->execute(['%' . $insumo . '%']);
+	WHERE insumos.nombre LIKE ? AND insumos.empresa_id = ?");
+	$sentencia->execute(['%' . $insumo . '%', $eid]);
 	return $sentencia->fetchAll();
 }
 
 function actualizarInformacionLocal($datos)
 {
-	$bd = conectarBaseDatos();
-	$sentencia = $bd->prepare("UPDATE informacion_negocio SET nombre = ?, telefono = ?, numeroMesas = ?, logo = ?");
-	return $sentencia->execute([$datos->nombre, $datos->telefono, $datos->numeroMesas, $datos->logo]);
+	try {
+		$bd = conectarBaseDatos();
+		$eid = getEmpresaId();
+		$sentencia = $bd->prepare("UPDATE informacion_negocio SET 
+            nombre = ?, 
+            ruc = ?, 
+            direccion = ?, 
+            telefono = ?, 
+            correo = ?, 
+            mensaje_pie = ?, 
+            impuesto = ?, 
+            logo = ?, 
+            numeroMesas = ? 
+            WHERE empresa_id = ?");
+		$exito = $sentencia->execute([
+			$datos->nombre,
+			$datos->ruc ?? '',
+			$datos->direccion ?? '',
+			$datos->telefono,
+			$datos->correo ?? '',
+			$datos->mensaje_pie ?? '',
+			$datos->impuesto ?? 0,
+			$datos->logo,
+			$datos->numeroMesas,
+			$eid
+		]);
+		return ["resultado" => $exito];
+	}
+	catch (Exception $e) {
+		return ["resultado" => false, "error" => $e->getMessage()];
+	}
 }
 
 function registrarInformacionLocal($datos)
 {
-	$bd = conectarBaseDatos();
-	$sentencia = $bd->prepare("INSERT INTO informacion_negocio (nombre, telefono, numeroMesas, logo) vALUES (?,?,?,?)");
-	return $sentencia->execute([$datos->nombre, $datos->telefono, $datos->numeroMesas, $datos->logo]);
+	try {
+		$bd = conectarBaseDatos();
+		$eid = getEmpresaId();
+		$sentencia = $bd->prepare("INSERT INTO informacion_negocio (empresa_id, nombre, ruc, direccion, telefono, correo, mensaje_pie, impuesto, logo, numeroMesas) VALUES(?,?,?,?,?,?,?,?,?,?)");
+		$exito = $sentencia->execute([
+			$eid,
+			$datos->nombre,
+			$datos->ruc ?? '',
+			$datos->direccion ?? '',
+			$datos->telefono,
+			$datos->correo ?? '',
+			$datos->mensaje_pie ?? '',
+			$datos->impuesto ?? 0,
+			$datos->logo,
+			$datos->numeroMesas
+		]);
+		return ["resultado" => $exito];
+	}
+	catch (Exception $e) {
+		return ["resultado" => false, "error" => $e->getMessage()];
+	}
 }
 
 function obtenerInformacionLocal()
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->query("SELECT * FROM informacion_negocio");
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("SELECT * FROM informacion_negocio WHERE empresa_id = ?");
+	$sentencia->execute([$eid]);
 	return $sentencia->fetchAll();
 }
 
@@ -547,26 +704,29 @@ function eliminarInsumo($idInsumo)
 function editarInsumo($insumo)
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->prepare("UPDATE insumos SET tipo = ?, codigo = ?, nombre = ?, descripcion = ?, categoria = ?, precio = ? WHERE id = ?");
-	return $sentencia->execute([$insumo->tipo, $insumo->codigo, $insumo->nombre, $insumo->descripcion, $insumo->categoria, $insumo->precio, $insumo->id]);
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("UPDATE insumos SET tipo = ?, codigo = ?, nombre = ?, descripcion = ?, categoria = ?, precio = ? WHERE id = ? AND empresa_id = ?");
+	return $sentencia->execute([$insumo->tipo, $insumo->codigo, $insumo->nombre, $insumo->descripcion, $insumo->categoria, $insumo->precio, $insumo->id, $eid]);
 
 }
 
 function obtenerInsumoPorId($idInsumo)
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->prepare("SELECT * FROM insumos WHERE id = ?");
-	$sentencia->execute([$idInsumo]);
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("SELECT * FROM insumos WHERE id = ? AND empresa_id = ?");
+	$sentencia->execute([$idInsumo, $eid]);
 	return $sentencia->fetchObject();
 }
 
 function obtenerInsumos($filtros)
 {
 	$bd = conectarBaseDatos();
-	$valoresAEjecutar = [];
+	$eid = getEmpresaId();
+	$valoresAEjecutar = [$eid];
 	$sql = "SELECT insumos.*, IFNULL(categorias.nombre, 'NO DEFINIDA') AS categoria
 	FROM insumos
-	LEFT JOIN categorias ON categorias.id = insumos.categoria WHERE 1 ";
+	LEFT JOIN categorias ON categorias.id = insumos.categoria WHERE insumos.empresa_id = ? ";
 
 	if ($filtros->tipo != "") {
 		$sql .= " AND  insumos.tipo = ?";
@@ -579,7 +739,7 @@ function obtenerInsumos($filtros)
 	}
 
 	if ($filtros->nombre != "") {
-		$sql .= " AND  insumos.nombre LIKE ? OR insumos.codigo LIKE ?";
+		$sql .= " AND (insumos.nombre LIKE ? OR insumos.codigo LIKE ?)";
 		array_push($valoresAEjecutar, '%' . $filtros->nombre . '%');
 		array_push($valoresAEjecutar, '%' . $filtros->nombre . '%');
 	}
@@ -591,16 +751,36 @@ function obtenerInsumos($filtros)
 
 function registrarInsumo($insumo)
 {
-	$bd = conectarBaseDatos();
-	$sentencia = $bd->prepare("INSERT INTO insumos (codigo, nombre, descripcion, precio, tipo,  categoria) VALUES (?,?,?,?,?,?)");
-	return $sentencia->execute([$insumo->codigo, $insumo->nombre, $insumo->descripcion, $insumo->precio, $insumo->tipo, $insumo->categoria]);
+	try {
+		$bd = conectarBaseDatos();
+		$empresa = requireTenant();
+		$eid = $empresa->id;
+
+		// Validar límites del plan
+		$limites = getLimitesPorPlan($empresa->plan);
+		$stmtCount = $bd->prepare("SELECT COUNT(*) FROM insumos WHERE empresa_id = ?");
+		$stmtCount->execute([$eid]);
+		$totalActual = $stmtCount->fetchColumn();
+
+		if ($totalActual >= $limites['insumos']) {
+			return ["resultado" => false, "error" => "Has alcanzado el límite de insumos de tu plan (" . $limites['insumos'] . ")"];
+		}
+
+		$sentencia = $bd->prepare("INSERT INTO insumos (empresa_id, codigo, nombre, descripcion, precio, tipo, categoria) VALUES (?,?,?,?,?,?,?)");
+		$exito = $sentencia->execute([$eid, $insumo->codigo, $insumo->nombre, $insumo->descripcion, $insumo->precio, $insumo->tipo, $insumo->categoria]);
+		return ["resultado" => $exito];
+	}
+	catch (Exception $e) {
+		return ["resultado" => false, "error" => "Error al registrar insumo: " . $e->getMessage()];
+	}
 }
 
 function obtenerCategoriasPorTipo($tipo)
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->prepare("SELECT * FROM categorias WHERE tipo = ?");
-	$sentencia->execute([$tipo]);
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("SELECT * FROM categorias WHERE empresa_id = ? AND tipo = ?");
+	$sentencia->execute([$eid, $tipo]);
 	return $sentencia->fetchAll();
 }
 
@@ -615,21 +795,30 @@ function eliminarCategoria($idCategoria)
 function editarCategoria($categoria)
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->prepare("UPDATE categorias SET tipo = ?, nombre = ?, descripcion = ? WHERE id = ?");
-	return $sentencia->execute([$categoria->tipo, $categoria->nombre, $categoria->descripcion, $categoria->id]);
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("UPDATE categorias SET tipo = ?, nombre = ?, descripcion = ? WHERE id = ? AND empresa_id = ?");
+	return $sentencia->execute([$categoria->tipo, $categoria->nombre, $categoria->descripcion, $categoria->id, $eid]);
 }
 
 function registrarCategoria($categoria)
 {
-	$bd = conectarBaseDatos();
-	$sentencia = $bd->prepare("INSERT INTO categorias (tipo, nombre, descripcion) VALUES (?,?,?)");
-	return $sentencia->execute([$categoria->tipo, $categoria->nombre, $categoria->descripcion]);
+	try {
+		$bd = conectarBaseDatos();
+		$eid = getEmpresaId();
+		$sentencia = $bd->prepare("INSERT INTO categorias (empresa_id, tipo, nombre, descripcion) VALUES (?,?,?,?)");
+		return $sentencia->execute([$eid, $categoria->tipo, $categoria->nombre, $categoria->descripcion]);
+	}
+	catch (Exception $e) {
+		return false;
+	}
 }
 
 function obtenerCategorias()
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->query("SELECT * FROM categorias ORDER BY id DESC");
+	$eid = getEmpresaId();
+	$sentencia = $bd->prepare("SELECT id, tipo, nombre, descripcion FROM categorias WHERE empresa_id = ?");
+	$sentencia->execute([$eid]);
 	return $sentencia->fetchAll();
 }
 
@@ -703,21 +892,26 @@ function registrarCliente(object $cliente, int $empresaId): bool
 	}
 
 	$bd = conectarBaseDatos();
-	$stmt = $bd->prepare(
-		"INSERT INTO clientes
-            (empresa_id, nombres, apellidos, tipo_id, cedula_ruc, telefono, direccion, correo)
-         VALUES (?,?,?,?,?,?,?,?)"
-	);
-	return $stmt->execute([
-		$empresaId,
-		trim($cliente->nombres),
-		trim($cliente->apellidos),
-		$cliente->tipo_id ?? 'CEDULA',
-		$cedula,
-		trim($cliente->telefono ?? ''),
-		trim($cliente->direccion ?? ''),
-		$correo ?: null,
-	]);
+	try {
+		$stmt = $bd->prepare(
+			"INSERT INTO clientes
+	            (empresa_id, nombres, apellidos, tipo_id, cedula_ruc, telefono, direccion, correo)
+	         VALUES (?,?,?,?,?,?,?,?)"
+		);
+		return $stmt->execute([
+			$empresaId,
+			trim($cliente->nombres),
+			trim($cliente->apellidos),
+			$cliente->tipo_id ?? 'CEDULA',
+			$cedula,
+			trim($cliente->telefono ?? ''),
+			trim($cliente->direccion ?? ''),
+			$correo ?: null,
+		]);
+	}
+	catch (\PDOException $e) {
+		return false;
+	}
 }
 
 function obtenerClientes(string $busqueda, int $empresaId): array
@@ -888,7 +1082,7 @@ function generarClaveAcceso(
 	string $serie, // SSS+PPP (6 dígitos)
 	string $secuencial, // 9 dígitos
 	string $codigoNumerico, // 8 dígitos aleatorios
-	string $tipoEmision = '1'	): string
+	string $tipoEmision = '1'): string
 {
 	$base = $fechaEmision . $tipoComp . $ruc . $ambiente . $serie . $secuencial . $codigoNumerico . $tipoEmision;
 	// Calcular dígito verificador (módulo 11)

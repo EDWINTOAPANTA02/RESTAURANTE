@@ -9,7 +9,7 @@
           </b-table-column>
 
           <b-table-column field="precio" label="Precio" v-slot="props">
-            ${{ props.row.precio }}
+            ${{ parseFloat(props.row.precio).toFixed(2) }}
           </b-table-column>
 
           <b-table-column field="cantidad" label="Cantidad" v-slot="props">
@@ -31,7 +31,7 @@
           </b-table-column>
 
           <b-table-column field="subtotal" label="Subtotal" v-slot="props">
-            ${{ props.row.cantidad * props.row.precio }}
+            ${{ parseFloat(props.row.cantidad * props.row.precio).toFixed(2) }}
           </b-table-column>
 
           <b-table-column

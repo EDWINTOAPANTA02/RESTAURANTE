@@ -23,12 +23,14 @@ import EditarCliente from '../components/Clientes/EditarCliente'
 Vue.use(Router)
 
 const ROLES = {
+  SUPERADMIN: 'SUPERADMIN',
   ADMIN: 'ADMINISTRADOR',
   CAJERO: 'CAJERO',
   MESERO: 'MESERO'
 }
 
-const TODOS = [ROLES.ADMIN, ROLES.CAJERO, ROLES.MESERO]
+const TODOS = [ROLES.ADMIN, ROLES.CAJERO, ROLES.MESERO, ROLES.SUPERADMIN]
+const SOLO_SUPERADMIN = [ROLES.SUPERADMIN]
 const SOLO_ADMIN = [ROLES.ADMIN]
 const ADMIN_CAJERO = [ROLES.ADMIN, ROLES.CAJERO]
 const ADMIN_MESERO = [ROLES.ADMIN, ROLES.MESERO]
@@ -144,6 +146,18 @@ const router = new Router({
       name: 'ReporteVentas',
       component: ReporteVentas,
       meta: { roles: ADMIN_CAJERO }
+    },
+    {
+      path: '/empresas',
+      name: 'Empresas',
+      component: () => import('../components/Empresas/Empresas.vue'),
+      meta: { roles: SOLO_SUPERADMIN }
+    },
+    {
+      path: '/registrar-empresa',
+      name: 'RegistrarEmpresa',
+      component: () => import('../components/Empresas/RegistrarEmpresa.vue'),
+      meta: { roles: SOLO_SUPERADMIN }
     },
   ]
 })

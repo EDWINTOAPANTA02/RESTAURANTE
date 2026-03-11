@@ -18,7 +18,7 @@
           class="has-text-weight-bold has-text-primary"
           style="font-size: 2.5em"
         >
-          ${{ total }}
+          ${{ parseFloat(total).toFixed(2) }}
         </span>
         <b-button
           type="is-success"
@@ -123,7 +123,7 @@
                 <div class="content is-size-7">
                   {{ insumo.descripcion }}
                   <div class="has-text-centered has-text-weight-bold">
-                    ${{ insumo.precio }}
+                    ${{ parseFloat(insumo.precio).toFixed(2) }}
                   </div>
                 </div>
               </div>

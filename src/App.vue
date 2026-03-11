@@ -3,7 +3,7 @@
     <configuracion-inicial v-if="configurar"/>
     <login @logeado="onLog" v-if="!logeado && !configurar"></login>
     <cambiar-password v-if="cambiarPassword"></cambiar-password>
-    <div v-if="logeado && !cambiarPassword">
+    <div v-if="logeado && !cambiarPassword && !configurar">
       <encabezado @cerrar="onClose"/> 
       <div class="container">
         <router-view/>

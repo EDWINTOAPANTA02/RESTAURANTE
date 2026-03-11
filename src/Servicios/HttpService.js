@@ -2,58 +2,89 @@ const RUTA_GLOBAL = "http://localhost/botanero_ventas/api/"
 
 const HttpService = {
     async registrar(datos, ruta) {
-        const respuesta = await fetch(RUTA_GLOBAL + ruta, {
-            method: "post",
-            body: JSON.stringify(datos),
-            credentials: 'include'
-        });
-        let resultado = await respuesta.json()
-        if (resultado && resultado.error) {
-            console.error("Error en registrar:", resultado.error)
-            return false
+        try {
+            const respuesta = await fetch(RUTA_GLOBAL + ruta, {
+                method: "post",
+                body: JSON.stringify(datos),
+                credentials: 'include'
+            });
+            let resultado = await respuesta.json()
+            return resultado
+        } catch (e) {
+            console.error("Error en HTTP registrar:", e)
+            return { resultado: false, error: "Error de conexión con el servidor" }
         }
-        return resultado
     },
 
     async obtenerConDatos(datos, ruta) {
-        const respuesta = await fetch(RUTA_GLOBAL + ruta, {
-            method: "post",
-            body: JSON.stringify(datos),
-            credentials: 'include'
-        });
-        let resultado = await respuesta.json()
-        if (resultado && resultado.error) {
-            console.error("Error en obtenerConDatos:", resultado.error)
-            return null
+        try {
+            const respuesta = await fetch(RUTA_GLOBAL + ruta, {
+                method: "post",
+                body: JSON.stringify(datos),
+                credentials: 'include'
+            });
+            let resultado = await respuesta.json()
+            if (resultado && resultado.error) {
+                console.error("Error en obtenerConDatos:", resultado.error)
+                return null
+            }
+            return resultado
+        } catch (e) {
+            console.error("Error en HTTP obtenerConDatos:", e)
+            return { resultado: false, error: "Error de conexión" }
         }
-        return resultado
     },
 
 
     async obtener(ruta) {
-        let respuesta = await fetch(RUTA_GLOBAL + ruta, {
-            credentials: 'include'
-        })
-        let datos = await respuesta.json()
-        if (datos && datos.error) {
-            console.error("Error en obtener:", datos.error)
+        try {
+            let respuesta = await fetch(RUTA_GLOBAL + ruta, {
+                credentials: 'include'
+            })
+            let datos = await respuesta.json()
+            if (datos && datos.error) {
+                console.error("Error en obtener:", datos.error)
+                return []
+            }
+            return datos
+        } catch (e) {
+            console.error("Error en HTTP obtener:", e)
             return []
         }
-        return datos
     },
 
     async eliminar(ruta, id) {
-        const respuesta = await fetch(RUTA_GLOBAL + ruta, {
-            method: "post",
-            body: JSON.stringify(id),
-            credentials: 'include'
-        });
-        let resultado = await respuesta.json()
-        if (resultado && resultado.error) {
-            console.error("Error en eliminar:", resultado.error)
-            return false
+        try {
+            const respuesta = await fetch(RUTA_GLOBAL + ruta, {
+                method: "post",
+                body: JSON.stringify(id),
+                credentials: 'include'
+            });
+            let resultado = await respuesta.json()
+            if (resultado && resultado.error) {
+                console.error("Error en eliminar:", resultado.error)
+                return false
+            }
+            return resultado
+        } catch (e) {
+            console.error("Error en HTTP eliminar:", e)
+            return { resultado: false, error: "Error de conexión" }
         }
-        return resultado
+    },
+
+    async actualizar(datos, ruta) {
+        try {
+            const respuesta = await fetch(RUTA_GLOBAL + ruta, {
+                method: "PUT",
+                body: JSON.stringify(datos),
+                credentials: 'include'
+            });
+            let resultado = await respuesta.json()
+            return resultado
+        } catch (e) {
+            console.error("Error en HTTP actualizar:", e)
+            return { resultado: false, error: "Error de conexión" }
+        }
     }
 
 }

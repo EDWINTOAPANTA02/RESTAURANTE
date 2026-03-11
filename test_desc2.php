@@ -1,0 +1,1 @@
+<?php $c = new PDO("mysql:host=localhost;port=3307;dbname=botanero_ventas", "root", ""); $s = $c->query("DESCRIBE empresas"); echo "Field | Type | Null | Default\n"; foreach($s->fetchAll() as $r) { echo $r["Field"] . " | " . $r["Type"] . " | " . $r["Null"] . " | " . $r["Default"] . "\n"; }

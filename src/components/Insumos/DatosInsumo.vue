@@ -38,7 +38,7 @@
         </b-field>
 
         <b-field label="Precio" >
-            <b-input type="number" placeholder="Precio de venta del insumo" v-model="insumo.precio"></b-input>
+            <b-input type="number" step="0.01" placeholder="Precio de venta del insumo" v-model="insumo.precio"></b-input>
         </b-field>
         <div class="has-text-centered">
             <b-button type="is-success" size="is-large" icon-left="check" @click="registrar">Registrar</b-button>

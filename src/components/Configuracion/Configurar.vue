@@ -42,23 +42,42 @@ export default ({
 
             HttpService.registrar(this.datosLocal, "registrar_datos_local.php")
             .then(registrado => {
-                if(registrado) {
+                this.cargando = false
+                if(registrado && (registrado.resultado || registrado === true)) {
                     this.$buefy.toast.open({
                         message: 'Información actualizada. Recarga la página para ver los cambios',
                         type: 'is-success'
                     })
                     this.obtenerInformacion()
+                } else {
+                    this.$buefy.toast.open({
+                        message: registrado ? registrado.error : 'No se pudo actualizar la información',
+                        type: 'is-danger'
+                    })
                 }
+            })
+            .catch(e => {
+                this.cargando = false
+                console.error(e)
+                this.$buefy.toast.open({
+                    message: 'Error al conectar con el servidor',
+                    type: 'is-danger'
+                })
             })
         },
         obtenerInformacion(){
             this.cargando = true
             HttpService.obtener("obtener_datos_local.php")
             .then(resultado => {
-                this.datosLocal = resultado
-                this.datosLocal.numeroMesas = parseInt(this.datosLocal.numeroMesas)
+                if (resultado) {
+                    this.datosLocal = resultado
+                    this.datosLocal.numeroMesas = parseInt(this.datosLocal.numeroMesas || 0)
+                }
                 this.cargando = false
-
+            })
+            .catch(e => {
+                this.cargando = false
+                console.error(e)
             })
         }
     }
