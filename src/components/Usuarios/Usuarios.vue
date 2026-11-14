@@ -46,6 +46,10 @@
             aria-page-label="Page"
             aria-current-label="Current page">
 
+            <b-table-column field="cedula" label="Cédula" searchable sortable v-slot="props">
+                {{ props.row.cedula || '—' }}
+            </b-table-column>
+
             <b-table-column field="correo" label="Correo" sortable v-slot="props">
                 {{ props.row.correo }}
             </b-table-column>
@@ -56,6 +60,10 @@
 
             <b-table-column field="telefono" label="Teléfono" searchable sortable v-slot="props">
                 {{ props.row.telefono }}
+            </b-table-column>
+
+            <b-table-column field="rol" label="Rol" sortable v-slot="props">
+                {{ props.row.rol }}
             </b-table-column>
 
             <b-table-column field="acciones" label="Acciones"  v-slot="props">

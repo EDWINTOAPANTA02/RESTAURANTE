@@ -8,8 +8,14 @@ if (!$usuario) {
 
 include_once "funciones.php";
 verificarRol(['ADMINISTRADOR']);
-$defecto = "PacoHunterDev";
-$usuario->password = password_hash($defecto, PASSWORD_DEFAULT);
+$cedula = isset($usuario->cedula) ? trim($usuario->cedula) : "";
+if ($cedula === "" || !validarCedulaEcuatoriana($cedula)) {
+    echo json_encode(["resultado" => false, "error" => "La cédula ingresada no es válida (debe tener 10 dígitos válidos)"]);
+    exit;
+}
+
+$usuario->cedula = $cedula;
+$usuario->password = password_hash($cedula, PASSWORD_DEFAULT);
 
 $resultado = registrarUsuario($usuario);
 echo json_encode($resultado);

@@ -1,0 +1,85 @@
+name: CI/CD - Build & Deploy RESTAURANTE SaaS
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  validate-and-build:
+    name: Validar PHP y Compilar Frontend Vue.js
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar PHP 8.1 (PDO, OpenSSL, DOM, cURL)
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: pdo, pdo_mysql, openssl, curl, dom, simplexml
+
+      - name: Validar sintaxis PHP en api/ y api/middleware/
+        run: |
+          find api -name "*.php" -print0 | xargs -0 -n1 php -l
+
+      - name: Configurar Node.js 16
+        uses: actions/setup-node@v4
+        with:
+          node-version: '16'
+          cache: 'npm'
+
+      - name: Instalar dependencias y compilar frontend (dist/)
+        run: |
+          npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+          npm run build
+
+      - name: Subir artefacto compilado (dist/)
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+
+  deploy:
+    name: Desplegar a Hosting de Pruebas / Producción (FTP)
+    needs: validate-and-build
+    runs-on: ubuntu-latest
+    if: ${{ secrets.FTP_SERVER != '' }}
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Descargar artefacto compilado (dist/)
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+
+      - name: Desplegar Frontend (dist/) a /htdocs/
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./dist/
+          server-dir: /htdocs/
+          dangerous-clean-slate: false
+
+      - name: Desplegar Backend (api/) a /htdocs/api/
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./api/
+          server-dir: /htdocs/api/
+          dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/config.php
+            **/log.txt
+            **/certificados/*.p12

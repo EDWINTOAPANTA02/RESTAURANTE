@@ -7,6 +7,7 @@ if (!$insumo) {
 }
 
 include_once "funciones.php";
+verificarRol(['ADMINISTRADOR']);
 
 $resultado = editarInsumo($insumo);
 echo json_encode($resultado);

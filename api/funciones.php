@@ -3,6 +3,7 @@
 define('DIRECTORIO', './fotos/');
 include_once "middleware/Auth.php";
 include_once "middleware/Tenant.php";
+include_once "sri_service.php";
 
 function verificarTablas()
 {
@@ -259,6 +260,14 @@ function registrarVenta($venta)
 		$sentenciaPedido->execute([$venta->idMesa, $empresa_id]);
 
 		$bd->commit();
+
+		// 4. Emitir comprobante electrónico SRI automáticamente para la venta
+		try {
+			emitirFacturaDesdeVenta((int)$idVenta, (int)$empresa_id, (int)$idUsuario);
+		} catch (\Throwable $eFac) {
+			// No interrumpir el cobro de mesa si falla la generación secundaria
+		}
+
 		return true;
 	}
 	catch (Exception $e) {
@@ -462,15 +471,16 @@ function editarUsuario($usuario)
 {
 	$bd = conectarBaseDatos();
 	$eid = getEmpresaId();
-	$sentencia = $bd->prepare("UPDATE usuarios SET correo = ?, nombre = ?, telefono = ?, rol = ? WHERE id = ? AND empresa_id = ?");
-	return $sentencia->execute([$usuario->correo, $usuario->nombre, $usuario->telefono, $usuario->rol, $usuario->id, $eid]);
+	$cedula = isset($usuario->cedula) ? trim($usuario->cedula) : null;
+	$sentencia = $bd->prepare("UPDATE usuarios SET cedula = ?, correo = ?, nombre = ?, telefono = ?, rol = ? WHERE id = ? AND empresa_id = ?");
+	return $sentencia->execute([$cedula, $usuario->correo, $usuario->nombre, $usuario->telefono, $usuario->rol, $usuario->id, $eid]);
 }
 
 function obtenerUsuarioPorId($idUsuario)
 {
 	$bd = conectarBaseDatos();
 	$eid = getEmpresaId();
-	$sentencia = $bd->prepare("SELECT id, correo, nombre, telefono FROM usuarios WHERE id = ? AND empresa_id = ?");
+	$sentencia = $bd->prepare("SELECT id, cedula, correo, nombre, telefono, rol FROM usuarios WHERE id = ? AND empresa_id = ?");
 	$sentencia->execute([$idUsuario, $eid]);
 	return $sentencia->fetchObject();
 }
@@ -479,7 +489,7 @@ function obtenerUsuarios()
 {
 	$bd = conectarBaseDatos();
 	$eid = getEmpresaId();
-	$sentencia = $bd->prepare("SELECT id, correo, nombre, telefono, rol FROM usuarios WHERE empresa_id = ?");
+	$sentencia = $bd->prepare("SELECT id, cedula, correo, nombre, telefono, rol FROM usuarios WHERE empresa_id = ?");
 	$sentencia->execute([$eid]);
 	return $sentencia->fetchAll();
 }
@@ -519,6 +529,33 @@ function getUsuarioId(): int
 	return (int)$usuario->id;
 }
 
+function validarCedulaEcuatoriana(string $cedula): bool
+{
+	$limpia = trim($cedula);
+	if (!preg_match('/^\d{10}$/', $limpia)) {
+		return false;
+	}
+	$provincia = (int)substr($limpia, 0, 2);
+	if (!(($provincia >= 1 && $provincia <= 24) || $provincia === 30)) {
+		return false;
+	}
+	$tercerDigito = (int)$limpia[2];
+	if ($tercerDigito < 6) {
+		$coef = [2, 1, 2, 1, 2, 1, 2, 1, 2];
+		$suma = 0;
+		for ($i = 0; $i < 9; $i++) {
+			$val = (int)$limpia[$i] * $coef[$i];
+			if ($val >= 10) {
+				$val -= 9;
+			}
+			$suma += $val;
+		}
+		$verificador = (10 - ($suma % 10)) % 10;
+		return $verificador === (int)$limpia[9];
+	}
+	return true;
+}
+
 function registrarUsuario($usuario)
 {
 	try {
@@ -537,18 +574,32 @@ function registrarUsuario($usuario)
 		}
 
 		$rol = isset($usuario->rol) ? $usuario->rol : 'MESERO';
-		$sentencia = $bd->prepare("INSERT INTO usuarios (empresa_id, correo, nombre, telefono, password, rol) VALUES(?,?,?,?,?,?)");
-		$exito = $sentencia->execute([$eid, $usuario->correo, $usuario->nombre, $usuario->telefono, $usuario->password, $rol]);
+		$cedula = isset($usuario->cedula) ? trim($usuario->cedula) : null;
+		$correo = isset($usuario->correo) ? trim($usuario->correo) : '';
+
+		// Verificar duplicados de correo o cédula dentro de la empresa (y correo global si tiene índice único)
+		$stmtDup = $bd->prepare("SELECT cedula, correo FROM usuarios WHERE correo = ? OR (empresa_id = ? AND cedula = ? AND cedula IS NOT NULL) LIMIT 1");
+		$stmtDup->execute([$correo, $eid, $cedula]);
+		$dup = $stmtDup->fetchObject();
+		if ($dup) {
+			if (!empty($cedula) && $dup->cedula === $cedula) {
+				return ["resultado" => false, "error" => "Ya existe un usuario con esta cédula en tu empresa."];
+			}
+			return ["resultado" => false, "error" => "Este correo electrónico ya está registrado en el sistema."];
+		}
+
+		$sentencia = $bd->prepare("INSERT INTO usuarios (empresa_id, cedula, correo, nombre, telefono, password, rol) VALUES(?,?,?,?,?,?,?)");
+		$exito = $sentencia->execute([$eid, $cedula, $correo, $usuario->nombre, $usuario->telefono, $usuario->password, $rol]);
 		return ["resultado" => $exito];
 	}
 	catch (PDOException $e) {
 		if ($e->getCode() == 23000 || str_contains($e->getMessage(), '1062')) {
-			return ["resultado" => false, "error" => "Este correo ya está registrado en el sistema."];
+			return ["resultado" => false, "error" => "La cédula o el correo ya están registrados en el sistema."];
 		}
-		return ["resultado" => false, "error" => "Error de base de datos: " . $e->getMessage()];
+		return ["resultado" => false, "error" => "Error interno al registrar el usuario."];
 	}
 	catch (Exception $e) {
-		return ["resultado" => false, "error" => $e->getMessage()];
+		return ["resultado" => false, "error" => "Error al procesar el registro."];
 	}
 }
 
@@ -556,11 +607,13 @@ function comenzarSesionSegura()
 {
 	if (session_status() === PHP_SESSION_NONE) {
 		// Configuraciones para compatibilidad con CORS y localhost:8080
+		$esHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+			|| (($_SERVER['SERVER_PORT'] ?? null) == 443);
 		$cookieParams = [
 			'lifetime' => 0,
 			'path' => '/',
 			'domain' => '', // Dominio actual
-			'secure' => false,
+			'secure' => $esHttps,
 			'httponly' => true,
 			'samesite' => 'Lax'
 		];
@@ -824,10 +877,15 @@ function obtenerCategorias()
 
 function conectarBaseDatos()
 {
-	$host = "localhost";
-	$db = "botanero_ventas";
-	$user = "root";
-	$pass = "";
+	$configPath = __DIR__ . '/config.php';
+	$config = file_exists($configPath) ? require $configPath : require __DIR__ . '/config.example.php';
+	$dbConfig = $config['db'];
+
+	$host = $dbConfig['host'];
+	$port = $dbConfig['port'];
+	$db = $dbConfig['name'];
+	$user = $dbConfig['user'];
+	$pass = $dbConfig['pass'];
 	$charset = 'utf8mb4';
 
 	$options = [
@@ -835,7 +893,7 @@ function conectarBaseDatos()
 		\PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_OBJ,
 		\PDO::ATTR_EMULATE_PREPARES => false,
 	];
-	$dsn = "mysql:host=$host;port=3307;dbname=$db;charset=$charset";
+	$dsn = "mysql:host=$host;port=$port;dbname=$db;charset=$charset";
 	try {
 		$pdo = new \PDO($dsn, $user, $pass, $options);
 		return $pdo;
@@ -1157,4 +1215,210 @@ function obtenerDetallesFactura(int $facturaId, int $empresaId): array
 	);
 	$stmt->execute([$facturaId, $empresaId]);
 	return $stmt->fetchAll();
+}
+
+function asegurarSucursalYPuntoEmision(int $empresaId): object
+{
+	$sucursales = obtenerSucursales($empresaId);
+	foreach ($sucursales as $s) {
+		if (!empty($s->punto_emision_id)) {
+			return $s;
+		}
+	}
+
+	$bd = conectarBaseDatos();
+	$empresa = obtenerEmpresaPorId($empresaId);
+	$direccion = $empresa->direccion_matriz ?? 'Matriz Principal';
+
+	$stmtSuc = $bd->prepare(
+		"INSERT INTO sucursales (empresa_id, codigo, nombre, direccion, estado)
+         VALUES (?, '001', 'Matriz', ?, 'ACTIVA')"
+	);
+	$stmtSuc->execute([$empresaId, $direccion]);
+	$sucursalId = (int)$bd->lastInsertId();
+
+	$stmtPe = $bd->prepare(
+		"INSERT INTO puntos_emision (empresa_id, sucursal_id, codigo, nombre, estado)
+         VALUES (?, ?, '001', 'Caja Principal', 'ACTIVO')"
+	);
+	$stmtPe->execute([$empresaId, $sucursalId]);
+	$peId = (int)$bd->lastInsertId();
+
+	return (object)[
+		'id' => $sucursalId,
+		'codigo' => '001',
+		'direccion' => $direccion,
+		'punto_emision_id' => $peId,
+		'codigo_punto' => '001'
+	];
+}
+
+function emitirFacturaDesdeVenta(int $ventaId, int $empresaId, int $usuarioId): array
+{
+	$bd = conectarBaseDatos();
+
+	// Evitar duplicar factura si ya fue emitida para esta venta
+	$stmtExist = $bd->prepare("SELECT id, numero_serie, clave_acceso, estado_sri, total FROM facturas WHERE venta_id = ? AND empresa_id = ? LIMIT 1");
+	$stmtExist->execute([$ventaId, $empresaId]);
+	$existente = $stmtExist->fetchObject();
+	if ($existente) {
+		return ["resultado" => true, "factura" => $existente];
+	}
+
+	$stmtVenta = $bd->prepare("SELECT * FROM ventas WHERE id = ? AND empresa_id = ? LIMIT 1");
+	$stmtVenta->execute([$ventaId, $empresaId]);
+	$venta = $stmtVenta->fetchObject();
+	if (!$venta) {
+		return ["resultado" => false, "error" => "Venta no encontrada para esta empresa."];
+	}
+
+	$empresa = obtenerEmpresaPorId($empresaId);
+	if (!$empresa) {
+		return ["resultado" => false, "error" => "Empresa no encontrada."];
+	}
+
+	$cliente = null;
+	if (!empty($venta->cliente_id)) {
+		$cliente = obtenerClientePorId((int)$venta->cliente_id, $empresaId);
+	}
+
+	$suc = asegurarSucursalYPuntoEmision($empresaId);
+	$secuencial = obtenerSiguienteSecuencial($empresaId, (int)$suc->punto_emision_id, 'FACTURA');
+	$numeroSerie = "{$suc->codigo}-{$suc->codigo_punto}-{$secuencial}";
+
+	$rucEmisor = str_pad(preg_replace('/\D/', '', $empresa->ruc), 13, '0', STR_PAD_RIGHT);
+	$ambiente = (int)($empresa->ambiente ?? 1);
+	$tipoEmision = (string)($empresa->tipo_emision ?? 1);
+	$codigoNumerico = str_pad((string)random_int(10000000, 99999999), 8, '0', STR_PAD_LEFT);
+
+	$claveAcceso = generarClaveAcceso(
+		date('dmY', strtotime($venta->fecha)),
+		'01',
+		$rucEmisor,
+		$ambiente,
+		$suc->codigo . $suc->codigo_punto,
+		$secuencial,
+		$codigoNumerico,
+		$tipoEmision
+	);
+
+	$total = round((float)$venta->total, 2);
+	$tarifaIva = 15;
+	$subtotalIva = round($total / (1 + ($tarifaIva / 100)), 2);
+	$ivaValor = round($total - $subtotalIva, 2);
+
+	$stmtItems = $bd->prepare(
+		"SELECT iv.precio, iv.cantidad, i.nombre, i.codigo
+         FROM insumos_venta iv
+         INNER JOIN insumos i ON i.id = iv.idInsumo
+         WHERE iv.idVenta = ? AND iv.empresa_id = ?"
+	);
+	$stmtItems->execute([$ventaId, $empresaId]);
+	$items = $stmtItems->fetchAll();
+
+	$identificacionComprador = $cliente ? $cliente->cedula_ruc : '9999999999999';
+	$razonSocialComprador = $cliente ? trim($cliente->nombres . ' ' . $cliente->apellidos) : 'CONSUMIDOR FINAL';
+
+	$xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+		. "<factura id=\"comprobante\" version=\"1.1.0\">\n"
+		. "  <infoTributaria>\n"
+		. "    <ambiente>{$ambiente}</ambiente>\n"
+		. "    <tipoEmision>{$tipoEmision}</tipoEmision>\n"
+		. "    <razonSocial>" . htmlspecialchars($empresa->razon_social, ENT_XML1) . "</razonSocial>\n"
+		. "    <ruc>{$rucEmisor}</ruc>\n"
+		. "    <claveAcceso>{$claveAcceso}</claveAcceso>\n"
+		. "    <codDoc>01</codDoc>\n"
+		. "    <estab>{$suc->codigo}</estab>\n"
+		. "    <ptoEmi>{$suc->codigo_punto}</ptoEmi>\n"
+		. "    <secuencial>{$secuencial}</secuencial>\n"
+		. "    <dirMatriz>" . htmlspecialchars($empresa->direccion_matriz, ENT_XML1) . "</dirMatriz>\n"
+		. "  </infoTributaria>\n"
+		. "  <infoFactura>\n"
+		. "    <fechaEmision>" . date('d/m/Y', strtotime($venta->fecha)) . "</fechaEmision>\n"
+		. "    <razonSocialComprador>" . htmlspecialchars($razonSocialComprador, ENT_XML1) . "</razonSocialComprador>\n"
+		. "    <identificacionComprador>{$identificacionComprador}</identificacionComprador>\n"
+		. "    <totalSinImpuestos>{$subtotalIva}</totalSinImpuestos>\n"
+		. "    <importeTotal>{$total}</importeTotal>\n"
+		. "  </infoFactura>\n"
+		. "</factura>";
+
+	$xml = firmarXmlSri($xml, $empresaId);
+
+	$bd->beginTransaction();
+	try {
+		$stmtIns = $bd->prepare(
+			"INSERT INTO facturas
+             (empresa_id, sucursal_id, punto_emision_id, venta_id, cliente_id,
+              numero_serie, clave_acceso, ambiente_sri, fecha_emision,
+              subtotal_0, subtotal_iva, descuento, iva_valor, total,
+              estado_sri, xml_autorizado, usuario_id)
+             VALUES (?,?,?,?,?,?,?,?,?,0.00,?,0.00,?,?,'PENDIENTE',?,?)"
+		);
+		$stmtIns->execute([
+			$empresaId,
+			(int)$suc->id,
+			(int)$suc->punto_emision_id,
+			$ventaId,
+			$cliente ? (int)$cliente->id : null,
+			$numeroSerie,
+			$claveAcceso,
+			$ambiente,
+			$venta->fecha,
+			$subtotalIva,
+			$ivaValor,
+			$total,
+			$xml,
+			$usuarioId
+		]);
+		$facturaId = (int)$bd->lastInsertId();
+
+		$stmtDet = $bd->prepare(
+			"INSERT INTO detalles_factura
+             (factura_id, empresa_id, descripcion, codigo_principal, cantidad,
+              precio_unitario, descuento, subtotal, tarifa_iva, iva_valor)
+             VALUES (?,?,?,?,?,?,0.00,?,?,?)"
+		);
+		foreach ($items as $item) {
+			$lineaTotal = round((float)$item->precio * (float)$item->cantidad, 2);
+			$lineaSub = round($lineaTotal / (1 + ($tarifaIva / 100)), 2);
+			$lineaIva = round($lineaTotal - $lineaSub, 2);
+			$precioUnitSinIva = ((float)$item->cantidad > 0) ? round($lineaSub / (float)$item->cantidad, 4) : 0;
+
+			$stmtDet->execute([
+				$facturaId,
+				$empresaId,
+				$item->nombre,
+				$item->codigo,
+				$item->cantidad,
+				$precioUnitSinIva,
+				$lineaSub,
+				$tarifaIva,
+				$lineaIva
+			]);
+		}
+
+		$bd->commit();
+
+		registrarAuditoria(
+			'EMITIR_FACTURA',
+			'facturas',
+			$facturaId,
+			null,
+			['numero_serie' => $numeroSerie, 'clave_acceso' => $claveAcceso, 'total' => $total]
+		);
+
+		return [
+			"resultado" => true,
+			"factura" => (object)[
+				"id" => $facturaId,
+				"numero_serie" => $numeroSerie,
+				"clave_acceso" => $claveAcceso,
+				"estado_sri" => "PENDIENTE",
+				"total" => $total
+			]
+		];
+	} catch (\Throwable $e) {
+		$bd->rollBack();
+		return ["resultado" => false, "error" => "No se pudo emitir la factura."];
+	}
 }

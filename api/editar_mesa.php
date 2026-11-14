@@ -7,6 +7,7 @@ if (!$mesa) {
 }
 
 include_once "funciones.php";
+requireTenant();
 
 $resultado = editarMesa($mesa);
 echo json_encode($resultado);

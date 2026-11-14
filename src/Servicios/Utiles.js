@@ -4,7 +4,10 @@ const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "
 
 const Utiles = {
 	generarUrlImagen(imagen) {
-		return "http://localhost/botanero_ventas/api" + imagen
+		const base = process.env.NODE_ENV === 'production'
+			? './api'
+			: 'http://localhost/botanero_ventas/api'
+		return base + imagen
 	},
 	generarGrafica(array, contenedor, grafica, id) {
 		this.resetearGrafica(contenedor, grafica, id)
@@ -79,6 +82,27 @@ const Utiles = {
 			if (!valor || !clave) errores.push("Debes colocar el valor de " + clave)
 		}
 		return errores
+	},
+
+	validarCedula(cedula) {
+		if (!cedula) return false
+		const limpia = String(cedula).trim()
+		if (!/^\d{10}$/.test(limpia)) return false
+		const provincia = parseInt(limpia.substring(0, 2), 10)
+		if (!((provincia >= 1 && provincia <= 24) || provincia === 30)) return false
+		const tercerDigito = parseInt(limpia.charAt(2), 10)
+		if (tercerDigito < 6) {
+			const coef = [2, 1, 2, 1, 2, 1, 2, 1, 2]
+			let suma = 0
+			for (let i = 0; i < 9; i++) {
+				let val = parseInt(limpia.charAt(i), 10) * coef[i]
+				if (val >= 10) val -= 9
+				suma += val
+			}
+			const verificador = (10 - (suma % 10)) % 10
+			return verificador === parseInt(limpia.charAt(9), 10)
+		}
+		return true
 	},
 
 	cambiarNumeroANombreMes(arreglo) {

@@ -333,6 +333,10 @@ CREATE TABLE IF NOT EXISTS suscripciones (
     INDEX idx_empresa (empresa_id)
 );
 
+-- ── AJUSTES DE USUARIOS (SUPERADMIN Y CÉDULA) ────────────────
+CALL add_column_if_not_exists('botanero_ventas', 'usuarios', 'cedula', 'VARCHAR(20) NULL AFTER nombre');
+ALTER TABLE usuarios MODIFY COLUMN rol ENUM('SUPERADMIN','ADMINISTRADOR','MESERO','CAJERO') NOT NULL DEFAULT 'MESERO';
+
 -- Limpiar los procedimientos para no ensuciar la base final
 DROP PROCEDURE IF EXISTS add_column_if_not_exists;
 DROP PROCEDURE IF EXISTS drop_index_if_exists;

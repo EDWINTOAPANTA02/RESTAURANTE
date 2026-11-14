@@ -1,4 +1,6 @@
-const RUTA_GLOBAL = "http://localhost/botanero_ventas/api/"
+const RUTA_GLOBAL = process.env.NODE_ENV === 'production'
+    ? './api/'
+    : 'http://localhost/botanero_ventas/api/'
 
 const HttpService = {
     async registrar(datos, ruta) {

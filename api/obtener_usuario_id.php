@@ -7,6 +7,7 @@ if (!$idUsuario) {
 }
 
 include_once "funciones.php";
+verificarRol(['ADMINISTRADOR']);
 
 $resultado = obtenerUsuarioPorId($idUsuario);
 echo json_encode($resultado);

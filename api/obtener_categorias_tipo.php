@@ -7,6 +7,7 @@ if (!$tipoCategoria) {
 }
 
 include_once "funciones.php";
+requireTenant();
 
 $resultado = obtenerCategoriasPorTipo($tipoCategoria);
 echo json_encode($resultado);

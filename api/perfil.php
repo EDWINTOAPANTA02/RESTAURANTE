@@ -1,9 +1,11 @@
 <?php
 include_once "encabezado.php";
 include_once "funciones.php";
+$usuarioSesion = requireAuth();
+requireTenant();
 
 $datos = json_decode(file_get_contents("php://input"));
-$idUsuario = $datos->idUsuario;
+$idUsuario = (int)$usuarioSesion->id;
 $datosMes = $datos->porMes->mes;
 $datosMesAnio = $datos->porMes->anio;
 $anioSeleccionado = $datos->anioSeleccionadoGrafica;

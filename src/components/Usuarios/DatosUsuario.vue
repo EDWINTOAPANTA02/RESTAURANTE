@@ -3,6 +3,9 @@
          <ul v-if="errores.length > 0">
             <li class="has-text-danger has-text-centered" v-for="error in errores" :key="error">{{ error }}</li>
         </ul>
+        <b-field label="Cédula" >
+            <b-input type="text" maxlength="10" placeholder="Número de cédula de 10 dígitos (será su contraseña inicial)" v-model="usuario.cedula"></b-input>
+        </b-field>
         <b-field label="Correo electrónico" >
             <b-input type="email" placeholder="Correo del usuario" v-model="usuario.correo"></b-input>
         </b-field>
@@ -40,11 +43,15 @@ export default ({
     methods: {
         registrar(){
             let datos = {
+                cedula: this.usuario.cedula,
                 correo: this.usuario.correo,
                 nombre: this.usuario.nombre,
                 telefono: this.usuario.telefono
             }
             this.errores = Utiles.validar(datos)
+            if(this.usuario.cedula && !Utiles.validarCedula(this.usuario.cedula)) {
+                this.errores.push("La cédula ingresada no es válida (debe tener 10 dígitos válidos)")
+            }
             if(this.errores.length > 0) return
             this.$emit("registrado", this.usuario)
         }

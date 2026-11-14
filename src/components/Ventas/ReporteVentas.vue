@@ -171,6 +171,22 @@
         <strong>${{ parseFloat(props.row.total).toFixed(2) }}</strong>
       </b-table-column>
 
+      <b-table-column field="factura" label="Facturación SRI" v-slot="props">
+        <div v-if="props.row.factura">
+          <p class="is-size-7"><strong>{{ props.row.factura.numero_serie }}</strong></p>
+          <b-tag
+            :type="props.row.factura.estado_sri === 'AUTORIZADA' ? 'is-success' : (props.row.factura.estado_sri === 'RECHAZADA' ? 'is-danger' : 'is-warning')"
+            size="is-small"
+          >
+            {{ props.row.factura.estado_sri }}
+          </b-tag>
+          <p class="is-size-7 has-text-grey" v-if="props.row.factura.mensaje_sri">
+            {{ props.row.factura.mensaje_sri }}
+          </p>
+        </div>
+        <span class="tag is-light" v-else>Sin emitir</span>
+      </b-table-column>
+
       <b-table-column field="insumos" label="Insumos" v-slot="props">
         <b-table :data="props.row.insumos" :narrowed="true" class="is-size-7">
           <b-table-column field="codigo" label="Código" v-slot="props">
@@ -188,15 +204,38 @@
         </b-table>
       </b-table-column>
 
-      <b-table-column field="acciones" label="" v-slot="props">
+      <b-table-column field="acciones" label="Acciones" v-slot="props">
         <div class="field is-grouped">
-          <b-button
-            type="is-info"
-            class="mb-1"
-            @click="imprimirComprobante(props.row)"
-          >
-            <b-icon icon="printer"></b-icon>
-          </b-button>
+          <p class="control">
+            <b-button
+              type="is-info"
+              size="is-small"
+              title="Imprimir Ticket"
+              @click="imprimirComprobante(props.row)"
+            >
+              <b-icon icon="printer" size="is-small"></b-icon>
+            </b-button>
+          </p>
+          <p class="control">
+            <b-button
+              type="is-primary"
+              size="is-small"
+              icon-left="send"
+              @click="transmitirSri(props.row)"
+            >
+              SRI
+            </b-button>
+          </p>
+          <p class="control" v-if="props.row.factura">
+            <b-button
+              type="is-dark"
+              size="is-small"
+              icon-left="xml"
+              @click="descargarXml(props.row.factura)"
+            >
+              XML
+            </b-button>
+          </p>
         </div>
       </b-table-column>
     </b-table>
@@ -276,6 +315,49 @@ export default {
 
       this.insumosSeleccionados = venta.insumos;
       this.mostrarTicket = true;
+    },
+
+    transmitirSri(venta) {
+      this.cargando = true;
+      HttpService.registrar(
+        { venta_id: venta.id, enviar_sri: true },
+        "emitir_factura.php"
+      ).then((res) => {
+        this.cargando = false;
+        if (res && res.resultado) {
+          this.$buefy.toast.open({
+            message: `SRI (${res.estado_sri || "PROCESADO"}): ${res.mensaje_sri || "Comprobante procesado"}`,
+            type: res.estado_sri === "AUTORIZADA" ? "is-success" : "is-info",
+            duration: 5000,
+          });
+          this.obtenerVentas();
+        } else {
+          this.$buefy.toast.open({
+            message: res && res.error ? res.error : "Error al transmitir al SRI",
+            type: "is-danger",
+            duration: 5000,
+          });
+        }
+      });
+    },
+
+    descargarXml(factura) {
+      this.cargando = true;
+      HttpService.registrar(
+        { factura_id: factura.id },
+        "emitir_factura.php"
+      ).then((res) => {
+        this.cargando = false;
+        if (res && res.resultado && res.factura && res.factura.xml_autorizado) {
+          const blob = new Blob([res.factura.xml_autorizado], { type: "application/xml" });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `FACTURA_${factura.numero_serie}.xml`;
+          a.click();
+          window.URL.revokeObjectURL(url);
+        }
+      });
     },
 
     buscarEnFecha() {

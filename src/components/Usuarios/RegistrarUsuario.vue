@@ -27,6 +27,7 @@ export default ({
 
     data: () => ({
         usuario: {
+            cedula: "",
             correo: "",
             nombre: "",
             telefono: "",
@@ -43,13 +44,14 @@ export default ({
             .then(registrado => {
                 if(registrado && registrado.resultado) {
                     this.usuario = {
-                         correo: "",
+                        cedula: "",
+                        correo: "",
                         nombre: "",
                         telefono: "",
                         rol: "MESERO"
                     }
                     this.$buefy.toast.open({
-                        message: 'Usuario registrado. Recuerda que la contraseña por defecto es PacoHunterDev',
+                        message: 'Usuario registrado. Su contraseña inicial es su número de cédula',
                         type: 'is-success'
                     })
                 } else {

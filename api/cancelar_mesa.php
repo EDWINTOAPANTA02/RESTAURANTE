@@ -7,6 +7,7 @@ if (!$idMesa) {
 }
 
 include_once "funciones.php";
+requireTenant();
 
 $resultado = cancelarMesa($idMesa);
 

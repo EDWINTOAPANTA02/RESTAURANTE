@@ -7,6 +7,7 @@ if (!$insumo) {
 }
 
 include_once "funciones.php";
+requireTenant();
 
 $resultado = obtenerInsumosPorNombre($insumo);
 echo json_encode($resultado);

@@ -7,6 +7,7 @@ if (!$categoria) {
 }
 
 include_once "funciones.php";
+verificarRol(['ADMINISTRADOR']);
 
 $resultado = registrarCategoria($categoria);
 echo json_encode($resultado);

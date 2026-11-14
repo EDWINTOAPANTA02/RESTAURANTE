@@ -7,6 +7,7 @@ if (!$idCategoria) {
 }
 
 include_once "funciones.php";
+verificarRol(['ADMINISTRADOR']);
 
 $resultado = eliminarCategoria($idCategoria);
 echo json_encode($resultado);

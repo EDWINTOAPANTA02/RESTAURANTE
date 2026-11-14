@@ -7,6 +7,7 @@ if (!$idInsumo) {
 }
 
 include_once "funciones.php";
+verificarRol(['ADMINISTRADOR']);
 
 $resultado = eliminarInsumo($idInsumo);
 echo json_encode($resultado);

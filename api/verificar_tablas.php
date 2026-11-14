@@ -1,16 +1,12 @@
 <?php
 include_once "encabezado.php";
 include_once "funciones.php";
-$host = "localhost";
-$usuario = "root";
-$password = "";
 
-$conexion = new PDO("mysql:host=$host;port=3307", $usuario, $password);
-$conexion->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-$conexion->setAttribute(PDO::ATTR_EMULATE_PREPARES, FALSE);
-$conexion->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_OBJ);
-
-$sentencia = $conexion->query("SELECT COUNT(*) AS resultado FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = 'botanero_ventas'");
-$resultado = $sentencia->fetchAll();
-$conexion = null;
-echo json_encode($resultado[0]);
+try {
+    $bd = conectarBaseDatos();
+    $sentencia = $bd->query("SELECT COUNT(*) AS resultado FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE()");
+    $resultado = $sentencia->fetchAll();
+    echo json_encode($resultado[0]);
+} catch (\Throwable $e) {
+    echo json_encode((object)["resultado" => 0]);
+}

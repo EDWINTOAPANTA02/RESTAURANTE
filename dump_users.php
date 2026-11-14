@@ -1,1 +1,0 @@
-<?php $c = new PDO("mysql:host=localhost;port=3307;dbname=botanero_ventas", "root", ""); $s = $c->query("SELECT id, correo, rol, empresa_id FROM usuarios"); foreach($s->fetchAll(PDO::FETCH_ASSOC) as $r) { echo "ID: " . $r["id"] . " | Correo: " . $r["correo"] . " | Rol: " . $r["rol"] . " | Empresa: " . $r["empresa_id"] . "\n"; }

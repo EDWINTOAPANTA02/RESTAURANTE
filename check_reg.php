@@ -1,1 +1,0 @@
-<?php $c = new PDO("mysql:host=localhost;port=3307;dbname=botanero_ventas", "root", ""); $s = $c->query("SELECT * FROM empresas ORDER BY id DESC LIMIT 1"); $e = $s->fetch(PDO::FETCH_ASSOC); echo "EMPRESA: " . print_r($e, true) . "\n"; $s = $c->query("SELECT * FROM usuarios ORDER BY id DESC LIMIT 1"); $u = $s->fetch(PDO::FETCH_ASSOC); echo "USUARIO: " . print_r($u, true) . "\n";

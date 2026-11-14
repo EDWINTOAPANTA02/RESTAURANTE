@@ -7,6 +7,7 @@ if (!$idInsumo) {
 }
 
 include_once "funciones.php";
+requireTenant();
 
 $resultado = obtenerInsumoPorId($idInsumo);
 echo json_encode($resultado);
