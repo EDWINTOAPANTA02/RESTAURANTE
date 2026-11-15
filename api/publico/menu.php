@@ -25,11 +25,12 @@ try {
 }
 
 $stmtNegocio = $bd->prepare("
-    SELECT COALESCE(NULLIF(i.nombre, ''), e.razon_social) AS nombre,
+    SELECT COALESCE(NULLIF(i.nombre, ''), NULLIF(e.nombre_comercial, ''), e.razon_social) AS nombre,
            COALESCE(NULLIF(i.telefono, ''), e.telefono) AS telefono,
-           COALESCE(NULLIF(i.direccion, ''), e.direccion) AS direccion,
-           COALESCE(NULLIF(i.correo, ''), e.correo) AS correo,
-           i.logo, i.mensaje_pie, e.razon_social
+           e.direccion_matriz AS direccion,
+           e.correo AS correo,
+           i.logo,
+           e.razon_social
     FROM empresas e
     LEFT JOIN informacion_negocio i ON i.empresa_id = e.id
     WHERE e.id = ? AND e.estado IN ('ACTIVO', 'ACTIVA')

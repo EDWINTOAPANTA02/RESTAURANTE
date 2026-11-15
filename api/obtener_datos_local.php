@@ -8,7 +8,7 @@ $informacion = obtenerInformacionLocal();
 
 if (count($informacion) < 1) {
     $bd = conectarBaseDatos();
-    $stmtEmp = $bd->prepare("SELECT id, razon_social, ruc, telefono, direccion, correo FROM empresas WHERE id = ? LIMIT 1");
+    $stmtEmp = $bd->prepare("SELECT id, razon_social, ruc, telefono, direccion_matriz, correo FROM empresas WHERE id = ? LIMIT 1");
     $stmtEmp->execute([$eid]);
     $emp = $stmtEmp->fetchObject();
 
@@ -17,7 +17,7 @@ if (count($informacion) < 1) {
         "nombre" => $emp ? $emp->razon_social : "Restaurante",
         "ruc" => $emp ? ($emp->ruc ?? "") : "",
         "telefono" => $emp ? ($emp->telefono ?? "") : "",
-        "direccion" => $emp ? ($emp->direccion ?? "") : "",
+        "direccion" => $emp ? ($emp->direccion_matriz ?? "") : "",
         "correo" => $emp ? ($emp->correo ?? "") : "",
         "numeroMesas" => "5",
         "logo" => "/fotos/logo.png"
