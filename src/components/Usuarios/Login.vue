@@ -300,9 +300,24 @@ export default {
                 return Promise.resolve()
             }
 
+            let clientId = 'sb'
+            try {
+                const cfg = await HttpService.obtener("paypal/cliente_config.php")
+                if (cfg && cfg.client_id) {
+                    clientId = cfg.client_id
+                }
+            } catch (e) {
+                console.warn("Usando PayPal client_id por defecto:", e)
+            }
+
             return new Promise((resolve, reject) => {
                 const existing = document.getElementById('paypal-sdk')
                 if (existing) {
+                    if (window.paypal) {
+                        this.sdkCargado = true
+                        resolve()
+                        return
+                    }
                     existing.addEventListener('load', () => {
                         this.sdkCargado = true
                         resolve()
@@ -311,7 +326,7 @@ export default {
                 }
                 const script = document.createElement('script')
                 script.id = 'paypal-sdk'
-                script.src = "https://www.paypal.com/sdk/js?client-id=AbQXCIegm1AoyWZom0PiI3z5z_6UobxriqJj49KJLWGYdfIwT8TjQsDqTaaDfg8M3BoogmPVHiTpe8lu&currency=USD"
+                script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD`
                 script.addEventListener('load', () => {
                     this.sdkCargado = true
                     resolve()

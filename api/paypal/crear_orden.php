@@ -47,11 +47,15 @@ $response = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
 
+$resDecoded = json_decode($response);
+
 if ($httpCode !== 201 && $httpCode !== 200) {
-    http_response_code(500);
+    $issue = $resDecoded->details[0]->issue ?? ($resDecoded->name ?? 'ERROR');
+    http_response_code($httpCode ?: 500);
     echo json_encode([
-        "error" => "Error de PayPal (Código $httpCode)",
-        "debug" => json_decode($response)
+        "error" => "PayPal rechazó la orden ($issue)",
+        "issue" => $issue,
+        "debug" => $resDecoded
     ]);
     exit;
 }

@@ -34,10 +34,6 @@ const HttpService = {
             });
             let resultado = await respuesta.json()
             notificarSiExpirado(resultado)
-            if (resultado && resultado.error) {
-                console.error("Error en obtenerConDatos:", resultado.error)
-                return null
-            }
             return resultado
         } catch (e) {
             console.error("Error en HTTP obtenerConDatos:", e)
