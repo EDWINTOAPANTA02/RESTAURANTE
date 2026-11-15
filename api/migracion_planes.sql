@@ -12,3 +12,7 @@ INSERT INTO configuracion_planes (nombre_plan, precio, duracion_meses) VALUES
 ('ENTERPRISE', 60.00, 1),
 ('PREMIUM', 60.00, 1)
 ON DUPLICATE KEY UPDATE precio = VALUES(precio), duracion_meses = VALUES(duracion_meses);
+
+ALTER TABLE detalles_pedidos ADD COLUMN IF NOT EXISTS caracteristicas VARCHAR(255) DEFAULT '';
+ALTER TABLE detalles_pedidos ADD COLUMN IF NOT EXISTS estado VARCHAR(20) DEFAULT 'pendiente';
+

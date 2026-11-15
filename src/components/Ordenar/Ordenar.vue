@@ -25,20 +25,40 @@
           size="is-large"
           icon-left="basket-check"
           style="margin-top: 18px"
-          @click="realizarOrden"
+          @click="realizarOrden(false)"
           v-if="!estaAgregandoInsumos"
         >
           Ordenar
+        </b-button>
+        <b-button
+          type="is-warning"
+          size="is-large"
+          icon-left="printer"
+          style="margin-top: 18px; margin-left: 8px"
+          @click="realizarOrden(true)"
+          v-if="!estaAgregandoInsumos"
+        >
+          Ordenar e Imprimir Cocina
         </b-button>
         <b-button
           type="is-success"
           size="is-large"
           icon-left="basket-check"
           style="margin-top: 18px"
-          @click="editarOrden"
+          @click="editarOrden(false)"
           v-if="estaAgregandoInsumos"
         >
           Añadir
+        </b-button>
+        <b-button
+          type="is-warning"
+          size="is-large"
+          icon-left="printer"
+          style="margin-top: 18px; margin-left: 8px"
+          @click="editarOrden(true)"
+          v-if="estaAgregandoInsumos"
+        >
+          Añadir e Imprimir Cocina
         </b-button>
       </div>
     </div>
@@ -132,14 +152,21 @@
         </div>
       </div>
     </div>
+    <comanda-cocina
+      v-if="mostrarComanda"
+      :orden="datosComanda"
+      :insumos="insumosComanda"
+      @impreso="onComandaImpresa"
+    />
   </section>
 </template>
 <script>
 import HttpService from "../../Servicios/HttpService";
 import ProductosOrden from "./ProductosOrden.vue";
+import ComandaCocina from "./ComandaCocina.vue";
 export default {
   name: "Ordenar",
-  components: { ProductosOrden },
+  components: { ProductosOrden, ComandaCocina },
   data: () => ({
     idMesa: "",
     insumos: [],
@@ -149,6 +176,9 @@ export default {
     total: 0,
     cliente: "",
     estaAgregandoInsumos: false,
+    mostrarComanda: false,
+    datosComanda: {},
+    insumosComanda: [],
   }),
 
   mounted() {
@@ -166,7 +196,39 @@ export default {
     onProductoModificado(){
       this.calcularTotal()
     },
-    editarOrden() {
+    formatearFechaActual() {
+      const hoy = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      return (
+        hoy.getFullYear() +
+        "-" +
+        pad(hoy.getMonth() + 1) +
+        "-" +
+        pad(hoy.getDate()) +
+        " " +
+        pad(hoy.getHours()) +
+        ":" +
+        pad(hoy.getMinutes()) +
+        ":" +
+        pad(hoy.getSeconds())
+      );
+    },
+
+    onComandaImpresa() {
+      this.mostrarComanda = false;
+      this.$router.push({
+        name: "RealizarOrden",
+      });
+    },
+
+    editarOrden(imprimirCocina = false) {
+      if (this.insumosOrden.length === 0) {
+        this.$buefy.toast.open({
+          message: "Agrega al menos un platillo o bebida a la orden",
+          type: "is-warning",
+        });
+        return;
+      }
       let insumos = this.insumosAnteriores.concat(this.insumosOrden);
       let payload = {
         id: this.idMesa,
@@ -183,14 +245,33 @@ export default {
             message: "Insumos agregados",
             type: "is-success",
           });
-          this.$router.push({
-            name: "RealizarOrden",
-          });
+          if (imprimirCocina === true) {
+            this.datosComanda = {
+              idMesa: this.idMesa,
+              fecha: this.formatearFechaActual(),
+              atiende: payload.atiende,
+              cliente: this.cliente || "MOSTRADOR",
+              esAdicional: true,
+            };
+            this.insumosComanda = this.insumosOrden.slice();
+            this.mostrarComanda = true;
+          } else {
+            this.$router.push({
+              name: "RealizarOrden",
+            });
+          }
         }
       });
     },
 
-    realizarOrden() {
+    realizarOrden(imprimirCocina = false) {
+      if (this.insumosOrden.length === 0) {
+        this.$buefy.toast.open({
+          message: "Agrega al menos un platillo o bebida a la orden",
+          type: "is-warning",
+        });
+        return;
+      }
       let payload = {
         id: this.idMesa,
         insumos: this.insumosOrden,
@@ -206,9 +287,21 @@ export default {
             message: "Insumos agregados",
             type: "is-success",
           });
-          this.$router.push({
-            name: "RealizarOrden",
-          });
+          if (imprimirCocina === true) {
+            this.datosComanda = {
+              idMesa: this.idMesa,
+              fecha: this.formatearFechaActual(),
+              atiende: payload.atiende,
+              cliente: this.cliente || "MOSTRADOR",
+              esAdicional: false,
+            };
+            this.insumosComanda = this.insumosOrden.slice();
+            this.mostrarComanda = true;
+          } else {
+            this.$router.push({
+              name: "RealizarOrden",
+            });
+          }
         }
       });
     },

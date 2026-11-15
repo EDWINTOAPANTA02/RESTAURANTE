@@ -324,7 +324,7 @@ function leerArchivo($numeroMesa)
 	$pedido = $sentencia->fetchObject();
 
 	if ($pedido) {
-		$sentenciaDetalles = $bd->prepare("SELECT d.*, i.nombre, i.codigo FROM detalles_pedidos d INNER JOIN insumos i ON d.idInsumo = i.id WHERE d.idPedido = ? AND i.empresa_id = ?");
+		$sentenciaDetalles = $bd->prepare("SELECT d.*, i.nombre, i.codigo, i.tipo FROM detalles_pedidos d INNER JOIN insumos i ON d.idInsumo = i.id WHERE d.idPedido = ? AND i.empresa_id = ?");
 		$sentenciaDetalles->execute([$pedido->id, $eid]);
 		$detalles = $sentenciaDetalles->fetchAll();
 
@@ -334,8 +334,11 @@ function leerArchivo($numeroMesa)
 				"id" => $detalle->idInsumo,
 				"codigo" => $detalle->codigo,
 				"nombre" => $detalle->nombre,
+				"tipo" => $detalle->tipo ?? 'PLATILLO',
 				"precio" => $detalle->precio_unitario,
 				"cantidad" => $detalle->cantidad,
+				"caracteristicas" => $detalle->caracteristicas ?? '',
+				"estado" => $detalle->estado ?? 'pendiente',
 				"idDetalle" => $detalle->id
 			];
 		}
@@ -343,6 +346,8 @@ function leerArchivo($numeroMesa)
 		return [
 			"mesa" => [
 				"idMesa" => $pedido->idMesa,
+				"idPedido" => $pedido->id,
+				"fecha" => $pedido->fecha_apertura,
 				"atiende" => $pedido->atiende,
 				"idUsuario" => $pedido->idUsuario,
 				"total" => 0, // Calculado en el frontend o sumando detalles
@@ -393,8 +398,10 @@ function editarMesa($mesa)
 
 			// 3. Insertar nuevos detalles
 			foreach ($mesa->insumos as $insumo) {
-				$sentenciaDetalle = $bd->prepare("INSERT INTO detalles_pedidos (idPedido, idInsumo, cantidad, precio_unitario) VALUES (?,?,?,?)");
-				$sentenciaDetalle->execute([$pedido->id, $insumo->id, $insumo->cantidad, $insumo->precio]);
+				$caracteristicas = isset($insumo->caracteristicas) ? trim($insumo->caracteristicas) : '';
+				$estado = isset($insumo->estado) ? $insumo->estado : 'pendiente';
+				$sentenciaDetalle = $bd->prepare("INSERT INTO detalles_pedidos (empresa_id, idPedido, idInsumo, cantidad, precio_unitario, caracteristicas, estado) VALUES (?,?,?,?,?,?,?)");
+				$sentenciaDetalle->execute([$eid, $pedido->id, $insumo->id, $insumo->cantidad, $insumo->precio, $caracteristicas, $estado]);
 			}
 		}
 
@@ -418,8 +425,10 @@ function ocuparMesa($mesa)
 	$idPedido = $bd->lastInsertId();
 
 	foreach ($mesa->insumos as $insumo) {
-		$sentenciaDetalle = $bd->prepare("INSERT INTO detalles_pedidos (idPedido, idInsumo, cantidad, precio_unitario) VALUES (?,?,?,?)");
-		$sentenciaDetalle->execute([$idPedido, $insumo->id, $insumo->cantidad, $insumo->precio]);
+		$caracteristicas = isset($insumo->caracteristicas) ? trim($insumo->caracteristicas) : '';
+		$estado = isset($insumo->estado) ? $insumo->estado : 'pendiente';
+		$sentenciaDetalle = $bd->prepare("INSERT INTO detalles_pedidos (empresa_id, idPedido, idInsumo, cantidad, precio_unitario, caracteristicas, estado) VALUES (?,?,?,?,?,?,?)");
+		$sentenciaDetalle->execute([$eid, $idPedido, $insumo->id, $insumo->cantidad, $insumo->precio, $caracteristicas, $estado]);
 	}
 	return true;
 }

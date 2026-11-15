@@ -96,6 +96,9 @@
                                 <b-button type="is-info" icon-left="plus" @click="ocuparMesa(mesa)">Agregar  insumos</b-button>
                             </p>
                             <p class="control">
+                                <b-button type="is-dark" icon-left="printer" @click="imprimirComandaCocina(mesa)">Comanda Cocina</b-button>
+                            </p>
+                            <p class="control">
                                 <b-button type="is-warning" icon-left="check" v-if="checkedRows.length > 0" @click="marcarInsumosEntregados(mesa)">Marcar entrega</b-button>
                             </p>
                             <p class="control">
@@ -108,6 +111,7 @@
         </div>
         <b-loading :is-full-page="true" v-model="cargando" :can-cancel="false"></b-loading>
         <ticket @impreso="onImpreso" :venta="this.ventaSeleccionada" :insumos="insumosSeleccionados" :datosLocal="datos" :logo="logo" v-if="mostrarTicket"></ticket>
+        <comanda-cocina @impreso="mostrarComanda = false" :orden="ordenComanda" :insumos="insumosComanda" v-if="mostrarComanda"></comanda-cocina>
 
         <ClienteModal v-if="mostrarClienteModal"
             :mesa="mesaActual"
@@ -119,12 +123,13 @@
 <script>
 import HttpService from '../../Servicios/HttpService'
 import ClienteModal from '../Ordenar/ClienteModal.vue'
+import ComandaCocina from '../Ordenar/ComandaCocina.vue'
 import Ticket from '../Ventas/Ticket.vue'
 import Utiles from '../../Servicios/Utiles'
 
 export default ({
     name: "RealizarOrden",
-    components: { Ticket, ClienteModal },
+    components: { Ticket, ClienteModal, ComandaCocina },
 
     data: () => ({
         datos: {},
@@ -137,6 +142,9 @@ export default ({
         mostrarTicket: false,
         ventaSeleccionada: {},
         insumosSeleccionados: [],
+        mostrarComanda: false,
+        ordenComanda: {},
+        insumosComanda: [],
         mostrarClienteModal: false,
         clienteSeleccionado: null,
         tipoFactura: 'CONSUMIDOR_FINAL',
@@ -184,6 +192,24 @@ export default ({
 
         onImpreso(resultado){
             this.mostrarTicket = resultado
+        },
+
+        imprimirComandaCocina(mesa){
+            const hoy = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            const fechaHora = hoy.getFullYear() + '-' + pad(hoy.getMonth() + 1) + '-' + pad(hoy.getDate()) + ' ' + pad(hoy.getHours()) + ':' + pad(hoy.getMinutes()) + ':' + pad(hoy.getSeconds());
+
+            // Si hay platillos pendientes, imprimir los pendientes; si todos están entregados, reimprimir todos
+            const pendientes = (mesa.insumos || []).filter(i => i.estado !== 'entregado');
+            this.insumosComanda = pendientes.length > 0 ? pendientes : (mesa.insumos || []);
+            this.ordenComanda = {
+                idMesa: mesa.mesa.idMesa,
+                fecha: mesa.mesa.fecha || fechaHora,
+                atiende: mesa.mesa.atiende || localStorage.getItem('nombreUsuario'),
+                cliente: mesa.mesa.cliente || 'MOSTRADOR',
+                esAdicional: false
+            };
+            this.mostrarComanda = true;
         },
 
         imprimirComprobante(venta){
