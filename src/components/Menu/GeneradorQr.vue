@@ -70,7 +70,7 @@
 </template>
 
 <script>
-import HttpService from "../Servicios/HttpService";
+import HttpService from "../../Servicios/HttpService";
 import Printd from "printd";
 
 export default {

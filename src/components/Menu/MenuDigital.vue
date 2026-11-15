@@ -85,8 +85,8 @@
 </template>
 
 <script>
-import HttpService from "../Servicios/HttpService";
-import Utiles from "../Servicios/Utiles";
+import HttpService from "../../Servicios/HttpService";
+import Utiles from "../../Servicios/Utiles";
 
 export default {
   name: "MenuDigital",
