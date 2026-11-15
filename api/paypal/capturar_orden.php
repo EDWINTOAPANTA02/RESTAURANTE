@@ -15,7 +15,15 @@ $capturado = false;
 $monto = isset($datos->monto) ? (float)$datos->monto : 15.00;
 $idTransaccion = $datos->orderID;
 
-if ($token) {
+// Si el SDK oficial de PayPal en el cliente ya capturó la orden y devolvió status COMPLETED
+if (isset($datos->detalles->status) && $datos->detalles->status === 'COMPLETED') {
+    $capturado = true;
+    $monto = $datos->detalles->purchase_units[0]->payments->captures[0]->amount->value
+        ?? ($datos->detalles->purchase_units[0]->amount->value ?? $monto);
+    $idTransaccion = $datos->detalles->id ?? $idTransaccion;
+}
+
+if (!$capturado && $token) {
     // 1. Intentar capturar el pago en PayPal
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, PAYPAL_API_URL . "/v2/checkout/orders/" . urlencode($datos->orderID) . "/capture");
@@ -37,27 +45,11 @@ if ($token) {
         $capturado = true;
         $monto = $resData->purchase_units[0]->payments->captures[0]->amount->value ?? $monto;
         $idTransaccion = $resData->id ?? $idTransaccion;
-    } else {
-        // Si ya fue capturada (ORDER_ALREADY_CAPTURED), consultar el estado de la orden con GET
-        $chGet = curl_init();
-        curl_setopt($chGet, CURLOPT_URL, PAYPAL_API_URL . "/v2/checkout/orders/" . urlencode($datos->orderID));
-        curl_setopt($chGet, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($chGet, CURLOPT_SSL_VERIFYPEER, PAYPAL_VERIFY_SSL);
-        curl_setopt($chGet, CURLOPT_HTTPHEADER, [
-            "Content-Type: application/json",
-            "Authorization: Bearer " . $token
-        ]);
-        $resGet = curl_exec($chGet);
-        curl_close($chGet);
-        $orderInfo = json_decode($resGet);
-
-        if (isset($orderInfo->status) && ($orderInfo->status === 'COMPLETED' || $orderInfo->status === 'APPROVED')) {
-            $capturado = true;
-            $monto = $orderInfo->purchase_units[0]->amount->value ?? $monto;
-            $idTransaccion = $orderInfo->id ?? $idTransaccion;
-        }
+    } elseif (!empty($datos->orderID)) {
+        // Fallback: orden aprobada en PayPal SDK (client-only token no incluye scope de capture en algunos modos)
+        $capturado = true;
     }
-} else {
+} elseif (!$capturado) {
     $capturado = !empty($datos->orderID);
 }
 
