@@ -374,31 +374,25 @@ export default {
                     onApprove: (data, actions) => {
                         this.cargando = true
                         this.modalReactivacionActivo = false
-                        const procesarCaptura = (orderID) => {
-                            return HttpService.registrar({
-                                orderID: orderID,
-                                empresa_id: this.infoSuspension.empresaId,
-                                monto: this.calcularMonto(this.infoSuspension.plan)
-                            }, "paypal/capturar_orden.php").then(res => {
-                                this.cargando = false
-                                if (res && res.resultado) {
-                                    this.$buefy.toast.open({
-                                        message: '¡Excelente! Pago procesado. Ya puedes ingresar.',
-                                        type: 'is-success',
-                                        duration: 6000
-                                    })
-                                } else {
-                                    this.$buefy.toast.open({
-                                        message: 'Error al confirmar pago: ' + (res && res.error ? res.error : 'Error desconocido'),
-                                        type: 'is-danger'
-                                    })
-                                }
-                            })
-                        }
-                        if (actions && actions.order) {
-                            return actions.order.capture().then(() => procesarCaptura(data.orderID)).catch(() => procesarCaptura(data.orderID))
-                        }
-                        return procesarCaptura(data.orderID)
+                        return HttpService.registrar({
+                            orderID: data.orderID,
+                            empresa_id: this.infoSuspension.empresaId,
+                            monto: this.calcularMonto(this.infoSuspension.plan)
+                        }, "paypal/capturar_orden.php").then(res => {
+                            this.cargando = false
+                            if (res && res.resultado) {
+                                this.$buefy.toast.open({
+                                    message: '¡Excelente! Pago procesado. Ya puedes ingresar.',
+                                    type: 'is-success',
+                                    duration: 6000
+                                })
+                            } else {
+                                this.$buefy.toast.open({
+                                    message: 'Error al confirmar pago: ' + (res && res.error ? res.error : 'Error desconocido'),
+                                    type: 'is-danger'
+                                })
+                            }
+                        })
                     },
                     onError: (err) => {
                         console.error("PayPal Error:", err)
