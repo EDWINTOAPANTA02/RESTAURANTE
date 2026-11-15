@@ -264,6 +264,7 @@ export default ({
             const payload = {
                 idMesa: mesa.mesa.idMesa,
                 cliente_id: payloadCliente.cliente_id,
+                cliente: payloadCliente.cliente_nombre || mesa.mesa.cliente,
                 tipo_factura: payloadCliente.tipo_factura,
                 total: mesa.mesa.total,
                 pagado: payloadCliente.pago,

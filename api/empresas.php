@@ -28,15 +28,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             }
 
             // 3. Inicializar tabla informacion_negocio
-            $s3 = $bd->prepare("INSERT INTO informacion_negocio (empresa_id, nombre, ruc, direccion, telefono, correo) VALUES (?,?,?,?,?,?)");
-            $s3->execute([$empresaId, $datos->razon_social, $datos->ruc, $direccion, $datos->telefono, $datos->correo]);
+            $s3 = $bd->prepare("INSERT INTO informacion_negocio (empresa_id, nombre, telefono, numeroMesas, logo) VALUES (?,?,?,5,'/fotos/logo.png')");
+            $s3->execute([$empresaId, $datos->razon_social, $datos->telefono]);
 
             // 4. Inicializar categorías por defecto
             $categoriasDefault = [
-                ['tipo' => 'PRODUCTO', 'nombre' => 'Entradas', 'desc' => 'Platos de entrada'],
-                ['tipo' => 'PRODUCTO', 'nombre' => 'Platos Fuertes', 'desc' => 'Platos principales'],
-                ['tipo' => 'PRODUCTO', 'nombre' => 'Bebidas', 'desc' => 'Refrescos y jugos'],
-                ['tipo' => 'INSUMO', 'nombre' => 'Materia Prima', 'desc' => 'Ingredientes básicos']
+                ['tipo' => 'PLATILLO', 'nombre' => 'Entradas', 'desc' => 'Platos de entrada'],
+                ['tipo' => 'PLATILLO', 'nombre' => 'Platos Fuertes', 'desc' => 'Platos principales'],
+                ['tipo' => 'BEBIDA', 'nombre' => 'Bebidas', 'desc' => 'Refrescos y jugos']
             ];
             $s4 = $bd->prepare("INSERT INTO categorias (empresa_id, tipo, nombre, descripcion) VALUES (?,?,?,?)");
             foreach ($categoriasDefault as $cat) {

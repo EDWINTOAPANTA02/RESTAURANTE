@@ -6,7 +6,7 @@ include_once "middleware/Tenant.php";
 include_once "middleware/Rbac.php";
 
 requireTenant();
-requireRole(['ADMINISTRADOR', 'CAJERO']);
+requireRole(['ADMINISTRADOR', 'CAJERO', 'MESERO']);
 
 $filtros = json_decode(file_get_contents("php://input"));
 $busqueda = trim($filtros->busqueda ?? '');

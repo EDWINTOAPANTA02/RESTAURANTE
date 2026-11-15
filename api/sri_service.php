@@ -307,7 +307,12 @@ function transmitirFacturaSri(int $facturaId, int $empresaId): array
             $estadoRecepcion = 'RECHAZADA';
         }
     }
-    if (preg_match_all('/<mensaje>(.*?)<\/mensaje>/s', $xmlRespRec, $mMsgs)) {
+    if (preg_match('/<mensaje>\s*<identificador>(\d+)<\/identificador>\s*<mensaje>(.*?)<\/mensaje>(?:\s*<informacionAdicional>(.*?)<\/informacionAdicional>)?/s', $xmlRespRec, $mDet)) {
+        $mensajeSri = "[SRI #{$mDet[1]}] " . trim($mDet[2]);
+        if (!empty($mDet[3])) {
+            $mensajeSri .= ": " . trim($mDet[3]);
+        }
+    } elseif (preg_match_all('/<mensaje>(.*?)<\/mensaje>/s', $xmlRespRec, $mMsgs)) {
         $textos = [];
         foreach ($mMsgs[1] as $bloque) {
             if (preg_match('/<mensaje>(.*?)<\/mensaje>/s', $bloque, $sub)) {
@@ -347,6 +352,13 @@ function transmitirFacturaSri(int $facturaId, int $empresaId): array
         }
     }
 
+    $jsonRespuestaSri = json_encode([
+        'fecha_envio' => date('Y-m-d H:i:s'),
+        'estado' => $estadoRecepcion,
+        'mensaje' => $mensajeSri,
+        'soap_raw' => $respRec['xml']
+    ], JSON_UNESCAPED_UNICODE);
+
     $upd = $bd->prepare(
         "UPDATE facturas
          SET estado_sri = ?, fecha_autorizacion = ?, numero_autorizacion = ?,
@@ -358,7 +370,7 @@ function transmitirFacturaSri(int $facturaId, int $empresaId): array
         $fechaAutorizacion,
         $numeroAutorizacion,
         $xmlActual,
-        $respRec['xml'],
+        $jsonRespuestaSri,
         $mensajeSri ?: 'Enviado al WS del SRI',
         $facturaId,
         $empresaId

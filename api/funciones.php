@@ -190,12 +190,26 @@ function obtenerVentasPorUsuario($fechaInicio, $fechaFin)
 	return $sentencia->fetchAll();
 }
 
-function obtenerVentas($inicio, $fin)
+function obtenerVentas($inicio, $fin, $idUsuario = "")
 {
 	$bd = conectarBaseDatos();
 	$eid = getEmpresaId();
-	$sentencia = $bd->prepare("SELECT ventas.id, ventas.idMesa, ventas.cliente, ventas.fecha, ventas.total, ventas.pagado, usuarios.nombre FROM ventas INNER JOIN usuarios ON usuarios.id = ventas.idUsuario WHERE ventas.empresa_id = ? AND DATE(ventas.fecha) >= ? AND DATE(ventas.fecha) <= ?");
-	$sentencia->execute([$eid, $inicio, $fin]);
+	$params = [$eid, $inicio, $fin];
+	$sql = "SELECT ventas.id, ventas.idMesa,
+	               COALESCE(NULLIF(ventas.cliente, ''), CONCAT(clientes.nombres, ' ', clientes.apellidos), 'CONSUMIDOR FINAL') AS cliente,
+	               ventas.fecha, ventas.total, ventas.pagado,
+	               usuarios.nombre AS atendio
+	        FROM ventas
+	        LEFT JOIN usuarios ON usuarios.id = ventas.idUsuario
+	        LEFT JOIN clientes ON clientes.id = ventas.cliente_id
+	        WHERE ventas.empresa_id = ? AND DATE(ventas.fecha) >= ? AND DATE(ventas.fecha) <= ?";
+	if ($idUsuario !== "") {
+		$sql .= " AND ventas.idUsuario = ?";
+		$params[] = $idUsuario;
+	}
+	$sql .= " ORDER BY ventas.id DESC";
+	$sentencia = $bd->prepare($sql);
+	$sentencia->execute($params);
 	return $sentencia->fetchAll();
 }
 
@@ -1318,6 +1332,45 @@ function emitirFacturaDesdeVenta(int $ventaId, int $empresaId, int $usuarioId): 
 
 	$identificacionComprador = $cliente ? $cliente->cedula_ruc : '9999999999999';
 	$razonSocialComprador = $cliente ? trim($cliente->nombres . ' ' . $cliente->apellidos) : 'CONSUMIDOR FINAL';
+	$tipoIdComprador = ($identificacionComprador === '9999999999999')
+		? '07'
+		: (strlen($identificacionComprador) === 13 ? '04' : '05');
+
+	$detallesXml = "  <detalles>\n";
+	foreach ($items as $item) {
+		$cant = number_format((float)$item->cantidad, 2, '.', '');
+		$lineaTotal = round((float)$item->precio * (float)$item->cantidad, 2);
+		$lineaSub = round($lineaTotal / (1 + ($tarifaIva / 100)), 2);
+		$lineaIva = round($lineaTotal - $lineaSub, 2);
+		$pUnit = ((float)$item->cantidad > 0) ? number_format($lineaSub / (float)$item->cantidad, 2, '.', '') : '0.00';
+		$subStr = number_format($lineaSub, 2, '.', '');
+		$ivaStr = number_format($lineaIva, 2, '.', '');
+		$codItem = htmlspecialchars($item->codigo ?: 'PROD01', ENT_XML1);
+		$descItem = htmlspecialchars($item->nombre ?: 'CONSUMO', ENT_XML1);
+
+		$detallesXml .= "    <detalle>\n"
+			. "      <codigoPrincipal>{$codItem}</codigoPrincipal>\n"
+			. "      <descripcion>{$descItem}</descripcion>\n"
+			. "      <cantidad>{$cant}</cantidad>\n"
+			. "      <precioUnitario>{$pUnit}</precioUnitario>\n"
+			. "      <descuento>0.00</descuento>\n"
+			. "      <precioTotalSinImpuesto>{$subStr}</precioTotalSinImpuesto>\n"
+			. "      <impuestos>\n"
+			. "        <impuesto>\n"
+			. "          <codigo>2</codigo>\n"
+			. "          <codigoPorcentaje>4</codigoPorcentaje>\n"
+			. "          <tarifa>15.00</tarifa>\n"
+			. "          <baseImponible>{$subStr}</baseImponible>\n"
+			. "          <valor>{$ivaStr}</valor>\n"
+			. "        </impuesto>\n"
+			. "      </impuestos>\n"
+			. "    </detalle>\n";
+	}
+	$detallesXml .= "  </detalles>\n";
+
+	$subTotStr = number_format($subtotalIva, 2, '.', '');
+	$ivaTotStr = number_format($ivaValor, 2, '.', '');
+	$totStr = number_format($total, 2, '.', '');
 
 	$xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
 		. "<factura id=\"comprobante\" version=\"1.1.0\">\n"
@@ -1325,6 +1378,7 @@ function emitirFacturaDesdeVenta(int $ventaId, int $empresaId, int $usuarioId): 
 		. "    <ambiente>{$ambiente}</ambiente>\n"
 		. "    <tipoEmision>{$tipoEmision}</tipoEmision>\n"
 		. "    <razonSocial>" . htmlspecialchars($empresa->razon_social, ENT_XML1) . "</razonSocial>\n"
+		. "    <nombreComercial>" . htmlspecialchars($empresa->razon_social, ENT_XML1) . "</nombreComercial>\n"
 		. "    <ruc>{$rucEmisor}</ruc>\n"
 		. "    <claveAcceso>{$claveAcceso}</claveAcceso>\n"
 		. "    <codDoc>01</codDoc>\n"
@@ -1335,11 +1389,32 @@ function emitirFacturaDesdeVenta(int $ventaId, int $empresaId, int $usuarioId): 
 		. "  </infoTributaria>\n"
 		. "  <infoFactura>\n"
 		. "    <fechaEmision>" . date('d/m/Y', strtotime($venta->fecha)) . "</fechaEmision>\n"
+		. "    <dirEstablecimiento>" . htmlspecialchars($empresa->direccion_matriz, ENT_XML1) . "</dirEstablecimiento>\n"
+		. "    <obligadoContabilidad>NO</obligadoContabilidad>\n"
+		. "    <tipoIdentificacionComprador>{$tipoIdComprador}</tipoIdentificacionComprador>\n"
 		. "    <razonSocialComprador>" . htmlspecialchars($razonSocialComprador, ENT_XML1) . "</razonSocialComprador>\n"
 		. "    <identificacionComprador>{$identificacionComprador}</identificacionComprador>\n"
-		. "    <totalSinImpuestos>{$subtotalIva}</totalSinImpuestos>\n"
-		. "    <importeTotal>{$total}</importeTotal>\n"
+		. "    <totalSinImpuestos>{$subTotStr}</totalSinImpuestos>\n"
+		. "    <totalDescuento>0.00</totalDescuento>\n"
+		. "    <totalConImpuestos>\n"
+		. "      <totalImpuesto>\n"
+		. "        <codigo>2</codigo>\n"
+		. "        <codigoPorcentaje>4</codigoPorcentaje>\n"
+		. "        <baseImponible>{$subTotStr}</baseImponible>\n"
+		. "        <valor>{$ivaTotStr}</valor>\n"
+		. "      </totalImpuesto>\n"
+		. "    </totalConImpuestos>\n"
+		. "    <propina>0.00</propina>\n"
+		. "    <importeTotal>{$totStr}</importeTotal>\n"
+		. "    <moneda>DOLAR</moneda>\n"
+		. "    <pagos>\n"
+		. "      <pago>\n"
+		. "        <formaPago>01</formaPago>\n"
+		. "        <total>{$totStr}</total>\n"
+		. "      </pago>\n"
+		. "    </pagos>\n"
 		. "  </infoFactura>\n"
+		. $detallesXml
 		. "</factura>";
 
 	$xml = firmarXmlSri($xml, $empresaId);

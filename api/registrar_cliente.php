@@ -6,7 +6,7 @@ include_once "middleware/Tenant.php";
 include_once "middleware/Rbac.php";
 
 requireTenant();
-requireRole(['ADMINISTRADOR', 'CAJERO']);
+requireRole(['ADMINISTRADOR', 'CAJERO', 'MESERO']);
 
 $datos = json_decode(file_get_contents("php://input"));
 if (!$datos || empty($datos->nombres) || empty($datos->apellidos) || empty($datos->cedula_ruc)) {
@@ -19,8 +19,15 @@ $empresaId = getEmpresaId();
 $resultado = registrarCliente($datos, $empresaId);
 
 if ($resultado) {
-    registrarAuditoria('CREAR_CLIENTE', 'clientes', 0, null, (array)$datos);
-    echo json_encode(['resultado' => true, 'mensaje' => 'Cliente registrado correctamente.']);
+    $creados = obtenerClientes(trim($datos->cedula_ruc), $empresaId);
+    $nuevoCliente = $creados[0] ?? null;
+    registrarAuditoria('CREAR_CLIENTE', 'clientes', $nuevoCliente ? (int)$nuevoCliente->id : 0, null, (array)$datos);
+    echo json_encode([
+        'resultado' => true,
+        'mensaje' => 'Cliente registrado correctamente.',
+        'id' => $nuevoCliente ? (int)$nuevoCliente->id : null,
+        'cliente' => $nuevoCliente
+    ]);
 }
 else {
     http_response_code(422);

@@ -336,6 +336,9 @@ CREATE TABLE IF NOT EXISTS suscripciones (
 -- ── AJUSTES DE USUARIOS (SUPERADMIN Y CÉDULA) ────────────────
 CALL add_column_if_not_exists('botanero_ventas', 'usuarios', 'cedula', 'VARCHAR(20) NULL AFTER nombre');
 ALTER TABLE usuarios MODIFY COLUMN rol ENUM('SUPERADMIN','ADMINISTRADOR','MESERO','CAJERO') NOT NULL DEFAULT 'MESERO';
+ALTER TABLE empresas MODIFY COLUMN plan ENUM('BASICO','PRO','PREMIUM','ENTERPRISE') NOT NULL DEFAULT 'BASICO';
+ALTER TABLE informacion_negocio DROP CONSTRAINT IF EXISTS chk_single_row;
+ALTER TABLE informacion_negocio MODIFY COLUMN id INT UNSIGNED NOT NULL AUTO_INCREMENT;
 
 -- Limpiar los procedimientos para no ensuciar la base final
 DROP PROCEDURE IF EXISTS add_column_if_not_exists;
