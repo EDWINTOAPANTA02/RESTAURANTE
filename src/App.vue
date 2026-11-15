@@ -5,7 +5,7 @@
     <cambiar-password v-if="cambiarPassword"></cambiar-password>
     <div v-if="logeado && !cambiarPassword && !configurar">
       <encabezado @cerrar="onClose"/> 
-      <div class="container">
+      <div class="container main-content">
         <router-view/>
       </div> 
       <pie /> 
@@ -92,6 +92,11 @@ export default {
         localStorage.setItem('nombreUsuario', logeado.datos.nombreUsuario)
         localStorage.setItem('idUsuario', logeado.datos.idUsuario)
         localStorage.setItem('rol', logeado.datos.rol)
+        if (logeado.datos.rol === 'SUPERADMIN') {
+          this.$router.push('/empresas').catch(() => {})
+        } else {
+          this.$router.push('/').catch(() => {})
+        }
       }
       
     },

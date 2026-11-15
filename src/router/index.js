@@ -159,6 +159,12 @@ const router = new Router({
       component: () => import('../components/Empresas/RegistrarEmpresa.vue'),
       meta: { roles: SOLO_SUPERADMIN }
     },
+    {
+      path: '/configurar-planes',
+      name: 'ConfigurarPlanes',
+      component: () => import('../components/Empresas/ConfigurarPlanes.vue'),
+      meta: { roles: SOLO_SUPERADMIN }
+    },
   ]
 })
 

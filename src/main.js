@@ -6,6 +6,7 @@ import App from './App'
 import '@mdi/font/css/materialdesignicons.css'
 import Buefy from 'buefy'
 import 'buefy/dist/buefy.css'
+import '@/assets/custom.css'
 import router from './router'
 
 Vue.use(Buefy);

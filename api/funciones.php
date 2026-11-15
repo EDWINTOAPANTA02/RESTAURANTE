@@ -455,7 +455,7 @@ function verificarPassword($password, $idUsuario)
 function iniciarSesion($ruc, $correo, $password)
 {
 	$bd = conectarBaseDatos();
-	$sentencia = $bd->prepare("SELECT u.* FROM usuarios u 
+	$sentencia = $bd->prepare("SELECT u.*, e.estado as empresa_estado, e.plan, e.fecha_vencimiento, e.id as empresa_id_detalle FROM usuarios u 
                                INNER JOIN empresas e ON e.id = u.empresa_id
                                WHERE e.ruc = ? AND u.correo = ?");
 	$sentencia->execute([$ruc, $correo]);
@@ -465,6 +465,11 @@ function iniciarSesion($ruc, $correo, $password)
 	elseif ($sentencia->rowCount() == 1) {
 		$passwordVerifica = password_verify($password, $usuario->password);
 		if ($usuario && $passwordVerifica) {
+			$vencida = (!empty($usuario->fecha_vencimiento) && strtotime($usuario->fecha_vencimiento) < strtotime(date('Y-m-d')));
+			if (($usuario->empresa_estado !== 'ACTIVO' || $vencida) && $usuario->rol !== 'SUPERADMIN') {
+				$usuario->isSuspended = true;
+				return $usuario;
+			}
 			return $usuario;
 		}
 		else {
@@ -743,7 +748,10 @@ function obtenerInformacionLocal()
 {
 	$bd = conectarBaseDatos();
 	$eid = getEmpresaId();
-	$sentencia = $bd->prepare("SELECT * FROM informacion_negocio WHERE empresa_id = ?");
+	$sentencia = $bd->prepare("SELECT i.*, e.fecha_vencimiento, e.estado as empresa_estado 
+                               FROM informacion_negocio i 
+                               INNER JOIN empresas e ON e.id = i.empresa_id 
+                               WHERE i.empresa_id = ?");
 	$sentencia->execute([$eid]);
 	return $sentencia->fetchAll();
 }

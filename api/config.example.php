@@ -18,4 +18,9 @@ return [
         'http://127.0.0.1',
         // 'https://tu-subdominio.infinityfreeapp.com',
     ],
+    'paypal' => [
+        'client_id' => getenv('PAYPAL_CLIENT_ID') ?: 'TU_PAYPAL_CLIENT_ID',
+        'secret' => getenv('PAYPAL_SECRET') ?: 'TU_PAYPAL_SECRET',
+        'api_url' => getenv('PAYPAL_API_URL') ?: 'https://api-m.paypal.com', // Usar https://api-m.sandbox.paypal.com en pruebas
+    ],
 ];

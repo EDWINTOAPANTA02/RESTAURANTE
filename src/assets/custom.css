@@ -1,0 +1,169 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap');
+
+/* Professional Theme Variables */
+:root {
+  --primary: #16A34A;
+  --primary-dark: #15803d;
+  --primary-light: #86EFAC;
+  --secondary: #1E293B;
+  --bg-color: #F8FAFC;
+  --white: #FFFFFF;
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --radius-md: 0.75rem;
+  --radius-lg: 1.25rem;
+  --radius-xl: 2rem;
+}
+
+/* Base Styles */
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--secondary);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, .title {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+}
+
+/* Glassmorphism Utility */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-md);
+}
+
+/* Component Overrides */
+.is-primary {
+  background-color: var(--primary) !important;
+  color: var(--white) !important;
+}
+
+.button {
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.button.is-primary {
+  background-color: var(--primary) !important;
+  box-shadow: 0 4px 14px 0 rgba(22, 163, 74, 0.39);
+}
+
+.button.is-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(22, 163, 74, 0.23);
+  background-color: var(--primary-dark) !important;
+}
+
+.card, .box {
+  border-radius: var(--radius-lg);
+  border: none;
+  box-shadow: var(--shadow-md);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  overflow: hidden;
+}
+
+.card:hover, .box:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+/* Navbar Enhancement */
+.navbar.is-primary {
+  background: var(--primary) !important;
+  padding: 0.5rem 0;
+}
+
+/* Global Background (Fondo) */
+.fondo {
+  background-color: var(--primary) !important;
+  background-image: linear-gradient(135deg, var(--primary) 0%, #065f46 100%) !important;
+  background-attachment: fixed !important;
+  background-size: cover !important;
+}
+
+/* Login Specific */
+.login-card {
+  max-width: 450px;
+  width: 100%;
+  padding: 2.5rem;
+  border-radius: var(--radius-xl);
+}
+
+.login-bg {
+  background: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), 
+              url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80');
+  background-size: cover;
+  background-position: center;
+}
+
+/* Input Fields */
+.input, .textarea, .select select {
+  border-radius: var(--radius-md);
+  border: 1px solid #E2E8F0;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.2s;
+}
+
+.input:focus, .textarea:focus, .select select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
+}
+
+/* Animations */
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-in {
+  animation: fadeInScale 0.5s ease-out forwards;
+}
+
+/* Fix for fixed navbar */
+.main-content {
+  padding-top: 6rem;
+  padding-bottom: 3rem;
+  min-height: 80vh;
+}
+
+/* Pricing Cards */
+.pricing-card {
+  transition: all 0.3s ease;
+  border: 1px solid #E2E8F0;
+  height: 100%;
+}
+.pricing-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--primary-light);
+}
+.pricing-card.is-featured {
+  border: 2px solid var(--primary);
+  transform: scale(1.05);
+  z-index: 1;
+}
+.pricing-card .plan-price {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--secondary);
+}
+.pricing-card .feature-list {
+  text-align: left;
+  margin: 1.5rem 0;
+}
+.pricing-card .feature-item {
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+}
+.pricing-card .feature-item i {
+  margin-right: 0.5rem;
+  color: var(--primary);
+}

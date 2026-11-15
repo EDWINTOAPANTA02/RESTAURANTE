@@ -27,6 +27,17 @@ if ($bloqueoHasta > $ahora) {
 $ruc = isset($usuario_p->ruc) ? trim($usuario_p->ruc) : null;
 $respuesta = iniciarSesion($ruc, $usuario_p->correo ?? '', $usuario_p->password ?? '');
 
+if ($respuesta && isset($respuesta->isSuspended) && $respuesta->isSuspended) {
+	echo json_encode([
+		"resultado" => false,
+		"error" => "SUSPENDIDA",
+		"mensaje" => "La cuenta de su restaurante está suspendida o caducada por falta de pago. ¿Deseas reactivarla pagando ahora con PayPal?",
+		"empresaId" => $respuesta->empresa_id ?? $respuesta->empresa_id_detalle ?? null,
+		"plan" => $respuesta->plan ?? 'BASICO'
+	]);
+	return;
+}
+
 if ($respuesta) {
 	// Limpiar contador de intentos y regenerar ID de sesión contra fijación de sesión
 	unset($_SESSION['login_intentos'], $_SESSION['login_bloqueo_hasta']);

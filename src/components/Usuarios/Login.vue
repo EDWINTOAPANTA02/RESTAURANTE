@@ -1,55 +1,245 @@
 <template>
-    <section class="hero is-fullheight fondo">
-       
+    <section class="hero is-fullheight login-bg">
         <div class="hero-body">
-           
-            <div class="container">
-        <p class="title is-1 has-text-weight-bold has-text-white has-text-centered titulo">
-            Sistema para restaurantes o venta de comida <br>
-            <b-icon
-                icon="account"
-                size="is-large"
-                >
-            </b-icon>
-            Iniciar sesión
-        </p> 
-            <div class="columns is-centered">
-                <div class="column is-5-tablet is-6-desktop is-6-widescreen" >
-                <form action="" class="box">
-                    <img src="@/assets/logo_principal.png" alt="" height="150" width="150" style="display: block; margin:0 auto;">
-                    <p class="title is-3 has-text-centered"></p>
-                    <b-field>
-                        <b-input placeholder="RUC o Código de Empresa"
-                            icon="domain"
-                            v-model="ruc">
-                        </b-input>
-                    </b-field>
+            <div class="container has-text-centered">
+                <div class="columns is-centered">
+                    <div class="column is-5-tablet is-4-desktop is-4-widescreen animate-in">
+                        <div class="box glass login-card">
+                            <div class="mb-6">
+                                <img src="@/assets/logo_empresa.png" alt="Logo" height="120" width="120" style="margin: 0 auto; display: block;">
+                                <h1 class="title is-3 mt-4 has-text-dark">Bienvenido</h1>
+                                <p class="subtitle is-6 has-text-grey">Gestiona tu restaurante con elegancia</p>
+                            </div>
 
-                    <b-field>
-                        <b-input placeholder="Correo electrónico"
-                            type="email"
-                            icon="email"
-                            v-model="correo">
-                        </b-input>
-                    </b-field>
+                            <form @submit.prevent="ingresar">
+                                <b-field label="Empresa" label-position="on-border">
+                                    <b-input 
+                                        placeholder="RUC o Código"
+                                        icon="domain"
+                                        v-model="ruc"
+                                        size="is-medium"
+                                        required>
+                                    </b-input>
+                                </b-field>
 
-                    <b-field>
-                        <b-input type="password"
-                            placeholder="Contraseña"
-                            v-model="password"
-                            password-reveal>
-                        </b-input>
-                    </b-field>
+                                <b-field label="Correo" label-position="on-border" class="mt-4">
+                                    <b-input 
+                                        placeholder="email@ejemplo.com"
+                                        type="email"
+                                        icon="email"
+                                        v-model="correo"
+                                        size="is-medium"
+                                        required>
+                                    </b-input>
+                                </b-field>
 
-                    <div class="field has-text-centered">
-                    <b-button icon-left="login" type="is-primary" size="is-large" @click="ingresar">Ingresar</b-button>
+                                <b-field label="Contraseña" label-position="on-border" class="mt-4">
+                                    <b-input 
+                                        type="password"
+                                        placeholder="••••••••"
+                                        v-model="password"
+                                        size="is-medium"
+                                        password-reveal
+                                        required>
+                                    </b-input>
+                                </b-field>
+
+                                <div class="mt-6">
+                                    <b-button 
+                                        native-type="submit"
+                                        type="is-primary" 
+                                        size="is-large" 
+                                        expanded
+                                        :loading="cargando"
+                                        icon-left="login">
+                                        Acceder al Sistema
+                                    </b-button>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="mt-4 has-text-centered">
+                            <p class="has-text-white mb-2">¿Aún no tienes una cuenta?</p>
+                            <b-button 
+                                type="is-light" 
+                                outlined 
+                                rounded
+                                icon-left="shopping"
+                                @click="abrirPlanes">
+                                Ver Planes y Adquirir Sistema
+                            </b-button>
+                        </div>
+                        <p class="mt-6 has-text-white is-size-7 opacity-75">
+                            &copy; 2024 FoodSys. Todos los derechos reservados.
+                        </p>
                     </div>
-                </form>
                 </div>
-            </div>        
-            <b-loading :is-full-page="true" v-model="cargando" :can-cancel="false"></b-loading>
             </div>
         </div>
+
+        <!-- Modal de Planes -->
+        <b-modal :active.sync="modalPlanesActivo" width="900px" scroll="keep">
+            <div class="modal-card" style="width: auto">
+                <header class="modal-card-head has-background-primary">
+                    <p class="modal-card-title has-text-white">Planes Disponibles</p>
+                    <button type="button" class="delete" @click="modalPlanesActivo = false"/>
+                </header>
+                <section class="modal-card-body has-background-light">
+                    <div v-if="cargandoPlanes" class="has-text-centered py-6">
+                        <b-loading :is-full-page="false" v-model="cargandoPlanes"></b-loading>
+                        <p class="mt-4">Cargando planes disponibles...</p>
+                    </div>
+                    <div v-else-if="planes.length === 0" class="has-text-centered py-6">
+                        <b-icon icon="alert-circle-outline" size="is-large" type="is-warning"></b-icon>
+                        <p class="mt-4">No se pudieron cargar los planes. Verifica tu conexión.</p>
+                        <b-button type="is-primary" class="mt-4" @click="obtenerPlanes">Reintentar</b-button>
+                    </div>
+                    <div v-else class="columns is-multiline is-centered py-4">
+                        <div class="column is-4" v-for="p in planes" :key="p.id">
+                            <div class="box pricing-card has-text-centered" :class="{'is-featured': p.nombre_plan === 'PRO'}">
+                                <span class="tag is-primary is-rounded mb-2" v-if="p.nombre_plan === 'PRO'">RECOMENDADO</span>
+                                <h3 class="title is-4 mb-0">{{ p.nombre_plan }}</h3>
+                                <p class="is-size-7 has-text-grey mb-4">{{ p.duracion_meses }} Meses de servicio</p>
+                                <div class="plan-price mb-4">
+                                    <span class="is-size-4">$</span>{{ p.precio }}
+                                </div>
+                                <div class="feature-list is-size-7">
+                                    <div class="feature-item" v-if="p.nombre_plan === 'BASICO'">
+                                        <b-icon icon="check" size="is-small"></b-icon> Hasta 5 usuarios
+                                    </div>
+                                    <div class="feature-item" v-if="p.nombre_plan === 'PRO'">
+                                        <b-icon icon="check" size="is-small"></b-icon> Hasta 15 usuarios
+                                    </div>
+                                    <div class="feature-item" v-if="p.nombre_plan === 'PREMIUM' || p.nombre_plan === 'ENTERPRISE'">
+                                        <b-icon icon="check" size="is-small"></b-icon> Usuarios Ilimitados
+                                    </div>
+                                    <div class="feature-item">
+                                        <b-icon icon="check" size="is-small"></b-icon> Facturación Electrónica
+                                    </div>
+                                    <div class="feature-item">
+                                        <b-icon icon="check" size="is-small"></b-icon> Reportes en Tiempo Real
+                                    </div>
+                                </div>
+                                <b-button 
+                                    type="is-primary" 
+                                    expanded 
+                                    @click="seleccionarPlan(p)"
+                                    icon-left="cart-outline">
+                                    Adquirir Ahora
+                                </b-button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </b-modal>
+
+        <!-- Modal de Pago PayPal -->
+        <b-modal :active.sync="modalPagoActivo" width="450px" :can-cancel="false">
+             <div class="modal-card" style="width: auto">
+                <header class="modal-card-head has-background-dark">
+                    <p class="modal-card-title has-text-white">Confirmar Pago</p>
+                </header>
+                <section class="modal-card-body">
+                    <div class="has-text-centered mb-5">
+                         <p class="subtitle is-6 mb-1">Has seleccionado el plan:</p>
+                         <p class="title is-4 has-text-primary">{{ planSeleccionado ? planSeleccionado.nombre_plan : '' }}</p>
+                         <p class="title is-3 mt-4">${{ planSeleccionado ? planSeleccionado.precio : '0.00' }}</p>
+                    </div>
+                    <div id="paypal-button-new-container" style="min-height: 150px;"></div>
+                </section>
+                <footer class="modal-card-foot">
+                    <b-button @click="modalPagoActivo = false" expanded>Cancelar</b-button>
+                </footer>
+            </div>
+        </b-modal>
+
+        <!-- Modal de Registro Post-Pago -->
+        <b-modal :active.sync="modalRegistroActivo" width="600px" :can-cancel="false" scroll="keep">
+            <div class="modal-card" style="width: auto">
+                <header class="modal-card-head has-background-success">
+                    <p class="modal-card-title has-text-white">¡Pago Exitoso! Crea tu cuenta</p>
+                </header>
+                <section class="modal-card-body">
+                    <div class="columns is-multiline">
+                        <div class="column is-12">
+                            <h4 class="title is-5 mb-4">Información de la Empresa</h4>
+                            <b-field label="Nombre del Restaurante">
+                                <b-input v-model="nuevaEmpresa.razon_social" placeholder="Mi Restaurante Gourmet" required></b-input>
+                            </b-field>
+                            <b-field label="RUC / Identificación Fiscal (Opcional)">
+                                <b-input v-model="nuevaEmpresa.ruc" placeholder="1234567890001"></b-input>
+                            </b-field>
+                        </div>
+                        <div class="column is-12">
+                            <hr>
+                            <h4 class="title is-5 mb-4">Cuenta de Administrador</h4>
+                            <b-field label="Nombre del Dueño/Administrador">
+                                <b-input v-model="nuevaEmpresa.admin_nombre" placeholder="Juan Pérez" required></b-input>
+                            </b-field>
+                            <b-field label="Correo Electrónico (Será tu usuario)">
+                                <b-input type="email" v-model="nuevaEmpresa.admin_correo" placeholder="admin@mi-restaurante.com" required></b-input>
+                            </b-field>
+                            <b-field label="Contraseña">
+                                <b-input type="password" v-model="nuevaEmpresa.admin_password" password-reveal required></b-input>
+                            </b-field>
+                        </div>
+                    </div>
+                </section>
+                <footer class="modal-card-foot">
+                    <b-button 
+                        type="is-success" 
+                        expanded 
+                        :loading="cargandoRegistro"
+                        @click="finalizarRegistro">
+                        Completar Registro e Iniciar Sesión
+                    </b-button>
+                </footer>
+            </div>
+        </b-modal>
+
+        <!-- Modal de Reactivación -->
+        <b-modal :active.sync="modalReactivacionActivo" has-modal-card :can-cancel="false">
+            <div class="modal-card" style="width: 450px" v-if="infoSuspension">
+                <header class="modal-card-head has-background-danger">
+                    <p class="modal-card-title has-text-white">Cuenta Suspendida</p>
+                </header>
+                <section class="modal-card-body">
+                    <div class="has-text-centered mb-4">
+                        <b-icon icon="alert-circle-outline" size="is-large" type="is-danger"></b-icon>
+                        <p class="subtitle is-5 mt-2">¡Oh no! Tu suscripción ha vencido.</p>
+                    </div>
+                    <p class="has-text-grey mb-5">
+                        {{ infoSuspension.mensaje }}
+                    </p>
+                    <div class="box has-background-light">
+                        <div class="level is-mobile mb-0">
+                            <div class="level-left">
+                                <div>
+                                    <p class="heading">Plan Actual</p>
+                                    <p class="title is-6">{{ infoSuspension.plan }}</p>
+                                </div>
+                            </div>
+                            <div class="level-right">
+                                <div>
+                                    <p class="heading">Monto a Pagar</p>
+                                    <p class="title is-4 has-text-primary-dark">${{ calcularMonto(infoSuspension.plan).toFixed(2) }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <hr>
+                    <div id="paypal-button-container" style="min-height: 150px;">
+                        <div v-if="cargandoPaypal" class="has-text-centered p-4">
+                            <b-loading :is-full-page="false" v-model="cargandoPaypal"></b-loading>
+                            <p class="is-size-7 mt-2">Cargando métodos de pago...</p>
+                        </div>
+                    </div>
+                </section>
+                <footer class="modal-card-foot">
+                    <b-button @click="modalReactivacionActivo = false" expanded>Cerrar</b-button>
+                </footer>
+            </div>
+        </b-modal>
     </section>
 </template>
 <script>
@@ -62,10 +252,208 @@ export default {
         ruc: "",
         correo: "", 
         password: "",
-        cargando:false
+        cargando:false,
+        modalReactivacionActivo: false,
+        infoSuspension: null,
+        cargandoPaypal: false,
+        sdkCargado: false,
+
+        // Nuevos para Registro Público
+        modalPlanesActivo: false,
+        modalPagoActivo: false,
+        modalRegistroActivo: false,
+        planes: [],
+        planSeleccionado: null,
+        cargandoRegistro: false,
+        cargandoPlanes: false,
+        nuevaEmpresa: {
+            razon_social: "",
+            ruc: "",
+            admin_nombre: "",
+            admin_correo: "",
+            admin_password: "",
+            plan: ""
+        }
     }),
 
     methods: {
+        calcularMonto(plan) {
+            const precios = {
+                'BASICO': 15.00,
+                'PRO': 30.00,
+                'ENTERPRISE': 60.00,
+                'PREMIUM': 60.00
+            }
+            return precios[plan] || 15.00
+        },
+
+        abrirModalReactivacion() {
+            this.modalReactivacionActivo = true
+            this.cargandoPaypal = true
+            this.cargarPayPalSDK()
+        },
+
+        async cargarPayPalSDK() {
+            if (this.sdkCargado) {
+                this.initPayPal()
+                return
+            }
+
+            const script = document.createElement('script')
+            script.id = 'paypal-sdk'
+            script.src = "https://www.paypal.com/sdk/js?client-id=AbQXCIegm1AoyWZom0PiI3z5z_6UobxriqJj49KJLWGYdfIwT8TjQsDqTaaDfg8M3BoogmPVHiTpe8lu&currency=USD"
+            script.addEventListener('load', () => {
+                this.sdkCargado = true
+                this.initPayPal()
+            })
+            document.body.appendChild(script)
+        },
+
+        initPayPal() {
+            this.cargandoPaypal = false
+            // Pequeño delay para asegurar que el div existe en el modal animado
+            setTimeout(() => {
+                if (!window.paypal) return
+                
+                // Limpiar container previo si existe
+                const container = document.getElementById('paypal-button-container')
+                if (container) container.innerHTML = ''
+
+                window.paypal.Buttons({
+                    createOrder: (data, actions) => {
+                        return HttpService.registrar({
+                            plan: this.infoSuspension.plan,
+                            monto: this.calcularMonto(this.infoSuspension.plan),
+                            descripcion: `Reactivación Plan ${this.infoSuspension.plan} - Empresa ID: ${this.infoSuspension.empresaId}`
+                        }, "paypal/crear_orden.php").then(res => {
+                            if (res && res.id) return res.id
+                            const errorMsg = res.error ? (res.error + (res.debug ? ': ' + JSON.stringify(res.debug) : '')) : "Error al crear la orden de PayPal"
+                            throw new Error(errorMsg)
+                        })
+                    },
+                    onApprove: (data, actions) => {
+                        this.cargando = true
+                        this.modalReactivacionActivo = false
+                        return HttpService.registrar({
+                            orderID: data.orderID,
+                            empresa_id: this.infoSuspension.empresaId
+                        }, "paypal/capturar_orden.php").then(res => {
+                            this.cargando = false
+                            if (res.resultado) {
+                                this.$buefy.toast.open({
+                                    message: '¡Excelente! Pago procesado. Ya puedes ingresar.',
+                                    type: 'is-success',
+                                    duration: 6000
+                                })
+                            } else {
+                                this.$buefy.toast.open({
+                                    message: 'Error al confirmar pago: ' + res.error,
+                                    type: 'is-danger'
+                                })
+                            }
+                        })
+                    },
+                    onError: (err) => {
+                        console.error("PayPal Error:", err)
+                        this.$buefy.toast.open({
+                            message: 'Ocurrió un problema con PayPal. Intenta de nuevo.',
+                            type: 'is-danger'
+                        })
+                    }
+                }).render('#paypal-button-container')
+            }, 500)
+        },
+
+        abrirPlanes() {
+            this.modalPlanesActivo = true
+            this.obtenerPlanes()
+        },
+
+        obtenerPlanes() {
+            this.cargandoPlanes = true
+            HttpService.obtener("publico/obtener_planes.php").then(res => {
+                this.cargandoPlanes = false
+                if (Array.isArray(res)) {
+                    this.planes = res
+                } else {
+                    this.planes = []
+                }
+            }).catch(e => {
+                this.cargandoPlanes = false
+                this.planes = []
+                console.error(e)
+            })
+        },
+
+        seleccionarPlan(plan) {
+            this.planSeleccionado = plan
+            this.nuevaEmpresa.plan = plan.nombre_plan
+            this.modalPlanesActivo = false
+            this.modalPagoActivo = true
+            this.cargarPayPalSDK().then(() => {
+                this.initPayPalNuevo()
+            })
+        },
+
+        initPayPalNuevo() {
+            setTimeout(() => {
+                const container = document.getElementById('paypal-button-new-container')
+                if (container) container.innerHTML = ''
+                
+                window.paypal.Buttons({
+                    createOrder: (data, actions) => {
+                        return HttpService.registrar({
+                            plan: this.planSeleccionado.nombre_plan,
+                            monto: this.planSeleccionado.precio,
+                            descripcion: `Nuevo Registro Plan ${this.planSeleccionado.nombre_plan}`
+                        }, "paypal/crear_orden.php").then(res => {
+                            return res.id
+                        })
+                    },
+                    onApprove: (data, actions) => {
+                        this.modalPagoActivo = false
+                        this.modalRegistroActivo = true
+                        this.$buefy.toast.open({
+                            message: '¡Pago recibido! Por favor, completa los datos de tu restaurante.',
+                            type: 'is-success',
+                            duration: 5000
+                        })
+                    }
+                }).render('#paypal-button-new-container')
+            }, 500)
+        },
+
+        finalizarRegistro() {
+            if (!this.nuevaEmpresa.razon_social || !this.nuevaEmpresa.admin_correo || !this.nuevaEmpresa.admin_password) {
+                this.$buefy.toast.open({
+                    message: 'Por favor complete todos los campos obligatorios.',
+                    type: 'is-warning'
+                })
+                return
+            }
+
+            this.cargandoRegistro = true
+            HttpService.registrar(this.nuevaEmpresa, "publico/registrar_empresa.php").then(res => {
+                this.cargandoRegistro = false
+                if (res.resultado) {
+                    this.$buefy.toast.open({
+                        message: res.mensaje,
+                        type: 'is-success',
+                        duration: 5000
+                    })
+                    this.modalRegistroActivo = false
+                    // Auto-llenar login
+                    this.ruc = this.nuevaEmpresa.ruc
+                    this.correo = this.nuevaEmpresa.admin_correo
+                } else {
+                    this.$buefy.toast.open({
+                        message: res.error,
+                        type: 'is-danger'
+                    })
+                }
+            })
+        },
+
         ingresar(){
             if(!this.ruc) {
                 this.$buefy.toast.open({
@@ -106,6 +494,12 @@ export default {
                     return
                 }
 
+                if (log.error === "SUSPENDIDA") {
+                    this.infoSuspension = log
+                    this.abrirModalReactivacion()
+                    return
+                }
+
                 if(log.resultado === "cambia"){
                    this.$buefy.toast.open({
                         message: 'Datos correctos. Debes cambiar tu contraseña',
@@ -142,25 +536,3 @@ export default {
 
 }
 </script>
-<style>
-
- @import url('https://fonts.googleapis.com/css?family=Amaranth');
-.fondo {
-background-color: #54008C;
-background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 1000'%3E%3Cg fill-opacity='0.83'%3E%3Ccircle fill='%2354008C' cx='50' cy='0' r='50'/%3E%3Cg fill='%235b0092' %3E%3Ccircle cx='0' cy='50' r='50'/%3E%3Ccircle cx='100' cy='50' r='50'/%3E%3C/g%3E%3Ccircle fill='%23620098' cx='50' cy='100' r='50'/%3E%3Cg fill='%2369009d' %3E%3Ccircle cx='0' cy='150' r='50'/%3E%3Ccircle cx='100' cy='150' r='50'/%3E%3C/g%3E%3Ccircle fill='%236f00a3' cx='50' cy='200' r='50'/%3E%3Cg fill='%237600a9' %3E%3Ccircle cx='0' cy='250' r='50'/%3E%3Ccircle cx='100' cy='250' r='50'/%3E%3C/g%3E%3Ccircle fill='%237d00af' cx='50' cy='300' r='50'/%3E%3Cg fill='%238400b4' %3E%3Ccircle cx='0' cy='350' r='50'/%3E%3Ccircle cx='100' cy='350' r='50'/%3E%3C/g%3E%3Ccircle fill='%238b00ba' cx='50' cy='400' r='50'/%3E%3Cg fill='%239200c0' %3E%3Ccircle cx='0' cy='450' r='50'/%3E%3Ccircle cx='100' cy='450' r='50'/%3E%3C/g%3E%3Ccircle fill='%239900c6' cx='50' cy='500' r='50'/%3E%3Cg fill='%239f00cb' %3E%3Ccircle cx='0' cy='550' r='50'/%3E%3Ccircle cx='100' cy='550' r='50'/%3E%3C/g%3E%3Ccircle fill='%23a600d1' cx='50' cy='600' r='50'/%3E%3Cg fill='%23ad00d7' %3E%3Ccircle cx='0' cy='650' r='50'/%3E%3Ccircle cx='100' cy='650' r='50'/%3E%3C/g%3E%3Ccircle fill='%23b400dd' cx='50' cy='700' r='50'/%3E%3Cg fill='%23bb00e2' %3E%3Ccircle cx='0' cy='750' r='50'/%3E%3Ccircle cx='100' cy='750' r='50'/%3E%3C/g%3E%3Ccircle fill='%23c200e8' cx='50' cy='800' r='50'/%3E%3Cg fill='%23c800ee' %3E%3Ccircle cx='0' cy='850' r='50'/%3E%3Ccircle cx='100' cy='850' r='50'/%3E%3C/g%3E%3Ccircle fill='%23cf00f4' cx='50' cy='900' r='50'/%3E%3Cg fill='%23d600f9' %3E%3Ccircle cx='0' cy='950' r='50'/%3E%3Ccircle cx='100' cy='950' r='50'/%3E%3C/g%3E%3Ccircle fill='%23D0F' cx='50' cy='1000' r='50'/%3E%3C/g%3E%3C/svg%3E");
-background-attachment: fixed;
-background-size: contain;
-}
-
-   
-.titulo{
-    font-family: Amaranth, sans-serif;
-    text-align: center;
-    font-size: 75px;
-    letter-spacing: 2px;
-    word-spacing: 3px;
-    color: rgb(245, 251, 255);
-    text-shadow: rgb(0, 0, 0) -4px 2px 2px;
-}
-
-</style>

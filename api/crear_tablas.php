@@ -105,6 +105,28 @@ $sentencias = [
             cantidad INT NOT NULL,
             idVenta INT(11),
             PRIMARY KEY (id)
+ 		);'],
+
+      ["tabla" => "configuracion_planes",
+            "sentencia" =>
+            'CREATE TABLE IF NOT EXISTS configuracion_planes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            nombre_plan VARCHAR(50) NOT NULL UNIQUE,
+            precio DECIMAL(10, 2) NOT NULL,
+            duracion_meses INT DEFAULT 1,
+            fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+ 		);'],
+
+      ["tabla" => "pagos_empresa",
+            "sentencia" =>
+            'CREATE TABLE IF NOT EXISTS pagos_empresa (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            empresa_id BIGINT UNSIGNED NOT NULL,
+            monto DECIMAL(10,2) NOT NULL,
+            metodo_pago VARCHAR(50) DEFAULT "PAYPAL",
+            referencia VARCHAR(100),
+            fecha_pago DATETIME DEFAULT CURRENT_TIMESTAMP,
+            KEY empresa_id (empresa_id)
  		);']
 ];
 
