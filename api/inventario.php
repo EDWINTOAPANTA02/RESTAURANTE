@@ -8,15 +8,10 @@ if ($metodo === 'OPTIONS') {
     exit;
 }
 
-if (!estaAutenticado()) {
-    http_response_code(401);
-    echo json_encode(["error" => "No autenticado"]);
-    exit;
-}
-
-$bd = conectarBaseDatos();
-$eid = getEmpresaId();
+$empresa = requireTenant();
+$eid = $empresa->id;
 $uid = getUsuarioId();
+$bd = conectarBaseDatos();
 
 // Auto-migración de tablas de Inventario, Recetas y Movimientos (Kardex)
 $bd->exec("CREATE TABLE IF NOT EXISTS inventario_items (
