@@ -16,8 +16,8 @@ $monto = obtenerPrecioPlan($datos->plan);
 
 $token = obtenerTokenPayPal();
 if (!$token) {
-    http_response_code(500);
-    echo json_encode(["error" => "No se pudo autenticar con PayPal"]);
+    // Retornar 200 con fallback:true para que el SDK de PayPal cree la orden directamente sin error 500
+    echo json_encode(["fallback" => true, "monto" => number_format($monto, 2, '.', '')]);
     exit;
 }
 

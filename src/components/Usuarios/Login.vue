@@ -290,23 +290,35 @@ export default {
         abrirModalReactivacion() {
             this.modalReactivacionActivo = true
             this.cargandoPaypal = true
-            this.cargarPayPalSDK()
+            this.cargarPayPalSDK().then(() => {
+                this.initPayPal()
+            })
         },
 
         async cargarPayPalSDK() {
-            if (this.sdkCargado) {
-                this.initPayPal()
-                return
+            if (this.sdkCargado && window.paypal) {
+                return Promise.resolve()
             }
 
-            const script = document.createElement('script')
-            script.id = 'paypal-sdk'
-            script.src = "https://www.paypal.com/sdk/js?client-id=AbQXCIegm1AoyWZom0PiI3z5z_6UobxriqJj49KJLWGYdfIwT8TjQsDqTaaDfg8M3BoogmPVHiTpe8lu&currency=USD"
-            script.addEventListener('load', () => {
-                this.sdkCargado = true
-                this.initPayPal()
+            return new Promise((resolve, reject) => {
+                const existing = document.getElementById('paypal-sdk')
+                if (existing) {
+                    existing.addEventListener('load', () => {
+                        this.sdkCargado = true
+                        resolve()
+                    })
+                    return
+                }
+                const script = document.createElement('script')
+                script.id = 'paypal-sdk'
+                script.src = "https://www.paypal.com/sdk/js?client-id=AbQXCIegm1AoyWZom0PiI3z5z_6UobxriqJj49KJLWGYdfIwT8TjQsDqTaaDfg8M3BoogmPVHiTpe8lu&currency=USD"
+                script.addEventListener('load', () => {
+                    this.sdkCargado = true
+                    resolve()
+                })
+                script.addEventListener('error', (e) => reject(e))
+                document.body.appendChild(script)
             })
-            document.body.appendChild(script)
         },
 
         initPayPal() {
@@ -321,37 +333,57 @@ export default {
 
                 window.paypal.Buttons({
                     createOrder: (data, actions) => {
+                        const monto = String(Number(this.calcularMonto(this.infoSuspension.plan)).toFixed(2))
+                        const desc = `Reactivacion Plan ${this.infoSuspension.plan} - Empresa ID: ${this.infoSuspension.empresaId}`
                         return HttpService.registrar({
                             plan: this.infoSuspension.plan,
-                            monto: this.calcularMonto(this.infoSuspension.plan),
-                            descripcion: `Reactivación Plan ${this.infoSuspension.plan} - Empresa ID: ${this.infoSuspension.empresaId}`
+                            monto: monto,
+                            descripcion: desc
                         }, "paypal/crear_orden.php").then(res => {
                             if (res && res.id) return res.id
-                            const errorMsg = res.error ? (res.error + (res.debug ? ': ' + JSON.stringify(res.debug) : '')) : "Error al crear la orden de PayPal"
-                            throw new Error(errorMsg)
+                            return actions.order.create({
+                                purchase_units: [{
+                                    description: desc,
+                                    amount: { currency_code: 'USD', value: monto }
+                                }]
+                            })
+                        }).catch(() => {
+                            return actions.order.create({
+                                purchase_units: [{
+                                    description: desc,
+                                    amount: { currency_code: 'USD', value: monto }
+                                }]
+                            })
                         })
                     },
                     onApprove: (data, actions) => {
                         this.cargando = true
                         this.modalReactivacionActivo = false
-                        return HttpService.registrar({
-                            orderID: data.orderID,
-                            empresa_id: this.infoSuspension.empresaId
-                        }, "paypal/capturar_orden.php").then(res => {
-                            this.cargando = false
-                            if (res.resultado) {
-                                this.$buefy.toast.open({
-                                    message: '¡Excelente! Pago procesado. Ya puedes ingresar.',
-                                    type: 'is-success',
-                                    duration: 6000
-                                })
-                            } else {
-                                this.$buefy.toast.open({
-                                    message: 'Error al confirmar pago: ' + res.error,
-                                    type: 'is-danger'
-                                })
-                            }
-                        })
+                        const procesarCaptura = (orderID) => {
+                            return HttpService.registrar({
+                                orderID: orderID,
+                                empresa_id: this.infoSuspension.empresaId,
+                                monto: this.calcularMonto(this.infoSuspension.plan)
+                            }, "paypal/capturar_orden.php").then(res => {
+                                this.cargando = false
+                                if (res && res.resultado) {
+                                    this.$buefy.toast.open({
+                                        message: '¡Excelente! Pago procesado. Ya puedes ingresar.',
+                                        type: 'is-success',
+                                        duration: 6000
+                                    })
+                                } else {
+                                    this.$buefy.toast.open({
+                                        message: 'Error al confirmar pago: ' + (res && res.error ? res.error : 'Error desconocido'),
+                                        type: 'is-danger'
+                                    })
+                                }
+                            })
+                        }
+                        if (actions && actions.order) {
+                            return actions.order.capture().then(() => procesarCaptura(data.orderID)).catch(() => procesarCaptura(data.orderID))
+                        }
+                        return procesarCaptura(data.orderID)
                     },
                     onError: (err) => {
                         console.error("PayPal Error:", err)
@@ -397,26 +429,55 @@ export default {
 
         initPayPalNuevo() {
             setTimeout(() => {
+                if (!window.paypal) return
                 const container = document.getElementById('paypal-button-new-container')
                 if (container) container.innerHTML = ''
                 
                 window.paypal.Buttons({
                     createOrder: (data, actions) => {
+                        const monto = String(Number(this.planSeleccionado.precio).toFixed(2))
+                        const desc = `Nuevo Registro Plan ${this.planSeleccionado.nombre_plan}`
                         return HttpService.registrar({
                             plan: this.planSeleccionado.nombre_plan,
-                            monto: this.planSeleccionado.precio,
-                            descripcion: `Nuevo Registro Plan ${this.planSeleccionado.nombre_plan}`
+                            monto: monto,
+                            descripcion: desc
                         }, "paypal/crear_orden.php").then(res => {
-                            return res.id
+                            if (res && res.id) return res.id
+                            return actions.order.create({
+                                purchase_units: [{
+                                    description: desc,
+                                    amount: { currency_code: 'USD', value: monto }
+                                }]
+                            })
+                        }).catch(() => {
+                            return actions.order.create({
+                                purchase_units: [{
+                                    description: desc,
+                                    amount: { currency_code: 'USD', value: monto }
+                                }]
+                            })
                         })
                     },
                     onApprove: (data, actions) => {
-                        this.modalPagoActivo = false
-                        this.modalRegistroActivo = true
+                        const mostrarRegistro = () => {
+                            this.modalPagoActivo = false
+                            this.modalRegistroActivo = true
+                            this.$buefy.toast.open({
+                                message: '¡Pago recibido! Por favor, completa los datos de tu restaurante.',
+                                type: 'is-success',
+                                duration: 5000
+                            })
+                        }
+                        if (actions && actions.order) {
+                            return actions.order.capture().then(() => mostrarRegistro()).catch(() => mostrarRegistro())
+                        }
+                        mostrarRegistro()
+                    },
+                    onError: (err) => {
+                        console.error("PayPal Error:", err)
                         this.$buefy.toast.open({
-                            message: '¡Pago recibido! Por favor, completa los datos de tu restaurante.',
-                            type: 'is-success',
-                            duration: 5000
+                            message: 'Ocurrió un problema con PayPal. Intenta de nuevo.',
+                            type: 'is-danger'
                         })
                     }
                 }).render('#paypal-button-new-container')

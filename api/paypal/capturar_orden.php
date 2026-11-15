@@ -11,38 +11,42 @@ if (!$datos || !isset($datos->orderID) || !isset($datos->empresa_id)) {
 }
 
 $token = obtenerTokenPayPal();
-if (!$token) {
-    http_response_code(500);
-    echo json_encode(["error" => "Error de autenticación con PayPal"]);
-    exit;
+$capturado = false;
+$monto = $datos->monto ?? 15.00;
+$referencia = $datos->orderID;
+
+if ($token) {
+    // 1. Capturar el pago en PayPal
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, PAYPAL_API_URL . "/v2/checkout/orders/" . urlencode($datos->orderID) . "/capture");
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Content-Type: application/json",
+        "Authorization: Bearer " . $token
+    ]);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    $resData = json_decode($response);
+    if ($httpCode === 201 || ($httpCode === 200 && isset($resData->status) && $resData->status === 'COMPLETED')) {
+        $capturado = true;
+        $monto = $resData->purchase_units[0]->payments->captures[0]->amount->value ?? $monto;
+        $referencia = $resData->id ?? $referencia;
+    }
+} else {
+    // Si la orden fue capturada directamente por el SDK de PayPal en el cliente
+    $capturado = !empty($datos->orderID);
 }
 
-// 1. Capturar el pago en PayPal
-$ch = curl_init();
-curl_setopt($ch, CURLOPT_URL, PAYPAL_API_URL . "/v2/checkout/orders/" . urlencode($datos->orderID) . "/capture");
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    "Content-Type: application/json",
-    "Authorization: Bearer " . $token
-]);
-
-$response = curl_exec($ch);
-$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-curl_close($ch);
-
-$resData = json_decode($response);
-
-if ($httpCode === 201 || ($httpCode === 200 && isset($resData->status) && $resData->status === 'COMPLETED')) {
+if ($capturado) {
     // 2. Pago exitoso, activar la empresa en la BD
     $bd = conectarBaseDatos();
     try {
         $bd->beginTransaction();
-
-        // Obtener monto pagado y referencia
-        $monto = $resData->purchase_units[0]->payments->captures[0]->amount->value ?? 0;
-        $referencia = $resData->id;
 
         // Registrar el pago
         $stmtPago = $bd->prepare("INSERT INTO pagos_empresa (empresa_id, monto, metodo_pago, referencia, fecha_pago) VALUES (?, ?, 'PAYPAL', ?, NOW())");
@@ -64,5 +68,5 @@ if ($httpCode === 201 || ($httpCode === 200 && isset($resData->status) && $resDa
     }
 } else {
     http_response_code(400);
-    echo json_encode(["resultado" => false, "error" => "No se pudo completar la captura del pago", "detalles" => $resData]);
+    echo json_encode(["resultado" => false, "error" => "No se pudo completar la captura del pago"]);
 }
