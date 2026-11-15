@@ -16,6 +16,9 @@ define('PAYPAL_CLIENT_ID', $_resolvedClientId);
 define('PAYPAL_SECRET', getenv('PAYPAL_SECRET') ?: ($_paypalConfig['secret'] ?? ''));
 define('PAYPAL_API_URL', getenv('PAYPAL_API_URL') ?: ($_paypalConfig['api_url'] ?? 'https://api-m.sandbox.paypal.com'));
 
+$_appEnv = $_appConfig['env'] ?? (getenv('APP_ENV') ?: 'local');
+define('PAYPAL_VERIFY_SSL', $_appEnv === 'production');
+
 function obtenerTokenPayPal() {
     $credenciales = [
         PAYPAL_CLIENT_ID . ":" . PAYPAL_SECRET,
@@ -26,7 +29,7 @@ function obtenerTokenPayPal() {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, PAYPAL_API_URL . "/v1/oauth2/token");
         curl_setopt($ch, CURLOPT_HEADER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, PAYPAL_VERIFY_SSL);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_USERPWD, $userPwd);

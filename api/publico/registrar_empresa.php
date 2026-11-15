@@ -15,12 +15,29 @@ $bd = conectarBaseDatos();
 try {
     $bd->beginTransaction();
 
+    if (empty($datos->ruc)) {
+        throw new Exception("El RUC es obligatorio para registrar la empresa.");
+    }
+
+    // Verificar duplicados antes de insertar
+    $stmtCheckEmp = $bd->prepare("SELECT id FROM empresas WHERE ruc = ? LIMIT 1");
+    $stmtCheckEmp->execute([trim($datos->ruc)]);
+    if ($stmtCheckEmp->fetch()) {
+        throw new Exception("Este RUC ya se encuentra registrado en el sistema.");
+    }
+
+    $stmtCheckUsr = $bd->prepare("SELECT id FROM usuarios WHERE correo = ? LIMIT 1");
+    $stmtCheckUsr->execute([trim($datos->admin_correo)]);
+    if ($stmtCheckUsr->fetch()) {
+        throw new Exception("Este correo electrónico ya está registrado.");
+    }
+
     // 1. Crear la empresa (Activa por 1 mes ya que viene de un pago exitoso)
     $fechaVencimiento = date('Y-m-d', strtotime('+1 month'));
     $stmtEmpresa = $bd->prepare("INSERT INTO empresas (razon_social, ruc, plan, estado, fecha_vencimiento) VALUES (?, ?, ?, 'ACTIVO', ?)");
     $stmtEmpresa->execute([
-        $datos->razon_social,
-        $datos->ruc ?? null,
+        trim($datos->razon_social),
+        trim($datos->ruc),
         $datos->plan,
         $fechaVencimiento
     ]);
