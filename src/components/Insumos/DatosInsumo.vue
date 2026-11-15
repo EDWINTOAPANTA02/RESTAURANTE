@@ -40,6 +40,10 @@
         <b-field label="Precio" >
             <b-input type="number" step="0.01" placeholder="Precio de venta del insumo" v-model="insumo.precio"></b-input>
         </b-field>
+
+        <b-field label="Stock disponible hoy (Opcional — dejar vacío si es ilimitado)">
+            <b-input type="number" min="0" placeholder="Ej. 25 (o vacío para ilimitado)" v-model="insumo.stock"></b-input>
+        </b-field>
         <div class="has-text-centered">
             <b-button type="is-success" size="is-large" icon-left="check" @click="registrar">Registrar</b-button>
         </div>

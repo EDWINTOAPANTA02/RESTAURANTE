@@ -4,7 +4,7 @@
       <div class="comanda-header">
         <p class="comanda-titulo">*** COMANDA DE COCINA ***</p>
         <p class="comanda-subtitulo" v-if="orden.esAdicional">** PEDIDO ADICIONAL **</p>
-        <p class="comanda-mesa">MESA #{{ orden.idMesa }}</p>
+        <p class="comanda-mesa">{{ Number(orden.idMesa) === 0 ? 'PARA LLEVAR / DOMICILIO' : 'MESA #' + orden.idMesa }}</p>
       </div>
       <div class="comanda-separador">================================</div>
       <div class="comanda-meta">

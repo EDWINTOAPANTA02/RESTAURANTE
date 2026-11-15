@@ -148,6 +148,24 @@ const router = new Router({
       meta: { roles: ADMIN_CAJERO }
     },
     {
+      path: '/caja',
+      name: 'CierreCaja',
+      component: () => import('../components/Caja/CierreCaja.vue'),
+      meta: { roles: ADMIN_CAJERO }
+    },
+    {
+      path: '/menu-qr',
+      name: 'GeneradorQr',
+      component: () => import('../components/Menu/GeneradorQr.vue'),
+      meta: { roles: SOLO_ADMIN }
+    },
+    {
+      path: '/menu-digital/:empresaId',
+      name: 'MenuDigital',
+      component: () => import('../components/Menu/MenuDigital.vue'),
+      meta: { publica: true }
+    },
+    {
       path: '/empresas',
       name: 'Empresas',
       component: () => import('../components/Empresas/Empresas.vue'),

@@ -15,4 +15,25 @@ ON DUPLICATE KEY UPDATE precio = VALUES(precio), duracion_meses = VALUES(duracio
 
 ALTER TABLE detalles_pedidos ADD COLUMN IF NOT EXISTS caracteristicas VARCHAR(255) DEFAULT '';
 ALTER TABLE detalles_pedidos ADD COLUMN IF NOT EXISTS estado VARCHAR(20) DEFAULT 'pendiente';
+ALTER TABLE ventas ADD COLUMN IF NOT EXISTS metodo_pago VARCHAR(30) DEFAULT 'EFECTIVO';
+ALTER TABLE insumos ADD COLUMN IF NOT EXISTS stock INT NULL DEFAULT NULL;
+
+CREATE TABLE IF NOT EXISTS cierres_caja (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    empresa_id BIGINT UNSIGNED NOT NULL,
+    usuario_id BIGINT UNSIGNED NOT NULL,
+    fecha_apertura DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_cierre DATETIME NULL,
+    monto_inicial DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    total_efectivo DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    total_transferencia DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    total_tarjeta DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    gastos DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    efectivo_contado DECIMAL(10,2) NULL,
+    diferencia DECIMAL(10,2) NULL,
+    observaciones VARCHAR(255) DEFAULT '',
+    estado ENUM('ABIERTA', 'CERRADA') DEFAULT 'ABIERTA',
+    KEY idx_empresa_estado (empresa_id, estado)
+);
+
 

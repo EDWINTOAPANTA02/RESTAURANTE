@@ -195,9 +195,10 @@ function obtenerVentas($inicio, $fin, $idUsuario = "")
 	$bd = conectarBaseDatos();
 	$eid = getEmpresaId();
 	$params = [$eid, $inicio, $fin];
-	$sql = "SELECT ventas.id, ventas.idMesa,
+	$sql = "SELECT ventas.id, ventas.idMesa, ventas.cliente_id,
 	               COALESCE(NULLIF(ventas.cliente, ''), CONCAT(clientes.nombres, ' ', clientes.apellidos), 'CONSUMIDOR FINAL') AS cliente,
-	               ventas.fecha, ventas.total, ventas.pagado,
+	               clientes.cedula_ruc AS cliente_cedula, clientes.correo AS cliente_correo, clientes.telefono AS cliente_telefono, clientes.direccion AS cliente_direccion,
+	               ventas.fecha, ventas.total, ventas.pagado, IFNULL(ventas.metodo_pago, 'EFECTIVO') AS metodo_pago,
 	               usuarios.nombre AS atendio
 	        FROM ventas
 	        LEFT JOIN usuarios ON usuarios.id = ventas.idUsuario
@@ -258,20 +259,38 @@ function registrarVenta($venta)
 		$cliente_id = isset($venta->cliente_id) ? $venta->cliente_id : null;
 		$cliente_nombre = isset($venta->cliente) ? $venta->cliente : null;
 		$tipo_factura = isset($venta->tipo_factura) ? $venta->tipo_factura : 'CONSUMIDOR_FINAL';
+		$metodo_pago = isset($venta->metodo_pago) ? $venta->metodo_pago : 'EFECTIVO';
 		$empresa_id = isset($venta->empresa_id) ? $venta->empresa_id : $eid; // Use $eid if not provided
-		$idUsuario = isset($venta->idUsuario) ? $venta->idUsuario : 1;
+		$idUsuario = isset($venta->idUsuario) ? $venta->idUsuario : getUsuarioId();
+		$esCobroParcial = !empty($venta->cobro_parcial);
 
 		// 1. Registrar la venta
-		$sentencia = $bd->prepare("INSERT INTO ventas (idMesa, cliente, fecha, total, pagado, idUsuario, cliente_id, tipo_factura, empresa_id) VALUES (?,?,?,?,?,?,?,?,?)");
-		$sentencia->execute([$venta->idMesa, $cliente_nombre, date("Y-m-d H:i:s"), $venta->total, $venta->pagado, $idUsuario, $cliente_id, $tipo_factura, $empresa_id]);
+		$sentencia = $bd->prepare("INSERT INTO ventas (idMesa, cliente, fecha, total, pagado, idUsuario, cliente_id, tipo_factura, metodo_pago, empresa_id) VALUES (?,?,?,?,?,?,?,?,?,?)");
+		$sentencia->execute([$venta->idMesa, $cliente_nombre, date("Y-m-d H:i:s"), $venta->total, $venta->pagado, $idUsuario, $cliente_id, $tipo_factura, $metodo_pago, $empresa_id]);
 		$idVenta = $bd->lastInsertId();
 
-		// 2. Registrar los insumos de la venta
+		// 2. Registrar los insumos de la venta y descontar stock si aplica
 		registrarInsumosVenta($venta->insumos, $idVenta, $empresa_id, $bd);
 
-		// 3. Cerrar el pedido en la base de datos
-		$sentenciaPedido = $bd->prepare("UPDATE pedidos SET estado = 'PAGADO' WHERE idMesa = ? AND estado = 'ABIERTO' AND empresa_id = ?");
-		$sentenciaPedido->execute([$venta->idMesa, $empresa_id]);
+		// 3. Cerrar el pedido en la base de datos (si no es un cobro parcial de división de cuenta)
+		if (!$esCobroParcial) {
+			$sentenciaPedido = $bd->prepare("UPDATE pedidos SET estado = 'PAGADO' WHERE idMesa = ? AND estado = 'ABIERTO' AND empresa_id = ?");
+			$sentenciaPedido->execute([$venta->idMesa, $empresa_id]);
+		} elseif ($esCobroParcial && !empty($venta->insumos_restantes)) {
+			// Actualizar el pedido abierto dejando únicamente los insumos restantes por pagar
+			$stmtPed = $bd->prepare("SELECT id FROM pedidos WHERE idMesa = ? AND estado = 'ABIERTO' AND empresa_id = ? LIMIT 1");
+			$stmtPed->execute([$venta->idMesa, $empresa_id]);
+			$pedActual = $stmtPed->fetchObject();
+			if ($pedActual) {
+				$bd->prepare("DELETE FROM detalles_pedidos WHERE idPedido = ?")->execute([$pedActual->id]);
+				foreach ($venta->insumos_restantes as $insRest) {
+					$caract = isset($insRest->caracteristicas) ? trim($insRest->caracteristicas) : '';
+					$est = isset($insRest->estado) ? $insRest->estado : 'pendiente';
+					$stmtInsD = $bd->prepare("INSERT INTO detalles_pedidos (empresa_id, idPedido, idInsumo, cantidad, precio_unitario, caracteristicas, estado) VALUES (?,?,?,?,?,?,?)");
+					$stmtInsD->execute([$empresa_id, $pedActual->id, $insRest->id, $insRest->cantidad, $insRest->precio, $caract, $est]);
+				}
+			}
+		}
 
 		$bd->commit();
 
@@ -299,6 +318,9 @@ function registrarInsumosVenta($insumos, $idVenta, $empresa_id = 1, $bd = null)
 	foreach ($insumos as $insumo) {
 		$sentencia = $bd->prepare("INSERT INTO insumos_venta(idInsumo, precio, cantidad, idVenta, empresa_id) VALUES(?,?,?,?,?)");
 		$sentencia->execute([$insumo->id, $insumo->precio, $insumo->cantidad, $idVenta, $empresa_id]);
+		// Descontar stock si el insumo maneja stock numérico
+		$stmtStock = $bd->prepare("UPDATE insumos SET stock = GREATEST(0, stock - ?) WHERE id = ? AND empresa_id = ? AND stock IS NOT NULL");
+		$stmtStock->execute([(int)$insumo->cantidad, $insumo->id, $empresa_id]);
 		if ($sentencia)
 			array_push($resultados, $sentencia);
 	}
@@ -308,7 +330,13 @@ function registrarInsumosVenta($insumos, $idVenta, $empresa_id = 1, $bd = null)
 function obtenerMesas()
 {
 	$mesas = [];
-	$numeroMesas = obtenerInformacionLocal()[0]->numeroMesas;
+	$info = obtenerInformacionLocal();
+	$numeroMesas = (!empty($info) && isset($info[0]->numeroMesas)) ? (int)$info[0]->numeroMesas : 5;
+	// Incluir Mesa 0 (Para Llevar / Domicilio) si tiene un pedido abierto
+	$paraLlevar = leerArchivo(0);
+	if ($paraLlevar['mesa']['estado'] === 'ocupada') {
+		array_push($mesas, $paraLlevar);
+	}
 	for ($i = 1; $i <= $numeroMesas; $i++) {
 		array_push($mesas, leerArchivo($i));
 	}
@@ -789,8 +817,9 @@ function editarInsumo($insumo)
 {
 	$bd = conectarBaseDatos();
 	$eid = getEmpresaId();
-	$sentencia = $bd->prepare("UPDATE insumos SET tipo = ?, codigo = ?, nombre = ?, descripcion = ?, categoria = ?, precio = ? WHERE id = ? AND empresa_id = ?");
-	return $sentencia->execute([$insumo->tipo, $insumo->codigo, $insumo->nombre, $insumo->descripcion, $insumo->categoria, $insumo->precio, $insumo->id, $eid]);
+	$stock = (isset($insumo->stock) && $insumo->stock !== '' && $insumo->stock !== null) ? (int)$insumo->stock : null;
+	$sentencia = $bd->prepare("UPDATE insumos SET tipo = ?, codigo = ?, nombre = ?, descripcion = ?, categoria = ?, precio = ?, stock = ? WHERE id = ? AND empresa_id = ?");
+	return $sentencia->execute([$insumo->tipo, $insumo->codigo, $insumo->nombre, $insumo->descripcion, $insumo->categoria, $insumo->precio, $stock, $insumo->id, $eid]);
 
 }
 
@@ -850,8 +879,9 @@ function registrarInsumo($insumo)
 			return ["resultado" => false, "error" => "Has alcanzado el límite de insumos de tu plan (" . $limites['insumos'] . ")"];
 		}
 
-		$sentencia = $bd->prepare("INSERT INTO insumos (empresa_id, codigo, nombre, descripcion, precio, tipo, categoria) VALUES (?,?,?,?,?,?,?)");
-		$exito = $sentencia->execute([$eid, $insumo->codigo, $insumo->nombre, $insumo->descripcion, $insumo->precio, $insumo->tipo, $insumo->categoria]);
+		$stock = (isset($insumo->stock) && $insumo->stock !== '' && $insumo->stock !== null) ? (int)$insumo->stock : null;
+		$sentencia = $bd->prepare("INSERT INTO insumos (empresa_id, codigo, nombre, descripcion, precio, tipo, categoria, stock) VALUES (?,?,?,?,?,?,?,?)");
+		$exito = $sentencia->execute([$eid, $insumo->codigo, $insumo->nombre, $insumo->descripcion, $insumo->precio, $insumo->tipo, $insumo->categoria, $stock]);
 		return ["resultado" => $exito];
 	}
 	catch (Exception $e) {

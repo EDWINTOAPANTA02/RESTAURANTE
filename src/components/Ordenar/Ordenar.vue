@@ -2,13 +2,13 @@
   <section>
     <p class="title is-1 has-text-weight-bold">
       <b-icon icon="pen" size="is-large" type="is-primary"> </b-icon>
-      Tomar orden para la mesa #{{ idMesa }}
+      {{ Number(idMesa) === 0 ? 'Pedido Para Llevar / Domicilio' : 'Tomar orden para la mesa #' + idMesa }}
       <b-field
-        label="Nombre del cliente (Opcional)"
+        :label="Number(idMesa) === 0 ? 'Cliente / Teléfono / Dirección' : 'Nombre del cliente (Opcional)'"
         class="is-pulled-right"
         expanded
       >
-        <b-input placeholder="Ej. Don Paco" v-model="cliente"></b-input>
+        <b-input :placeholder="Number(idMesa) === 0 ? 'Ej. Juan Pérez - 0999999999 - Av. Principal' : 'Ej. Don Paco'" v-model="cliente"></b-input>
       </b-field>
     </p>
 
@@ -129,12 +129,15 @@
                     v-if="insumo.tipo === 'BEBIDA'"
                   ></b-icon>
                   {{ insumo.nombre }}
+                  <span class="tag is-danger is-light ml-1" v-if="insumo.stock !== null && insumo.stock !== undefined && Number(insumo.stock) <= 0">Agotado</span>
+                  <span class="tag is-warning is-light ml-1" v-else-if="insumo.stock !== null && insumo.stock !== undefined">Stock: {{ insumo.stock }}</span>
                 </div>
                 <b-button
                   class="mb-1 is-pulled-right"
                   type="is-primary"
                   size="is-small"
                   icon-left="plus"
+                  :disabled="insumo.stock !== null && insumo.stock !== undefined && Number(insumo.stock) <= 0"
                   @click="agregarInsumoAOrden(insumo)"
                 >
                 </b-button>
@@ -345,8 +348,22 @@ export default {
 
     agregarInsumoAOrden(insumo) {
       if (insumo) {
+        if (insumo.stock !== null && insumo.stock !== undefined && Number(insumo.stock) <= 0) {
+          this.$buefy.toast.open({
+            message: `El insumo "${insumo.nombre}" está AGOTADO en cocina`,
+            type: "is-danger",
+          });
+          return;
+        }
         let indice = this.verificarSiExisteEnLista(insumo.id);
         if (indice >= 0) {
+          if (insumo.stock !== null && insumo.stock !== undefined && this.insumosOrden[indice].cantidad >= Number(insumo.stock)) {
+            this.$buefy.toast.open({
+              message: `Solo quedan ${insumo.stock} unidades disponibles de "${insumo.nombre}"`,
+              type: "is-warning",
+            });
+            return;
+          }
           this.aumentarCantidad(indice);
         } else {
           this.insumosOrden.push({

@@ -42,9 +42,19 @@
                     Ventas
                 </b-navbar-item>
 
+                <b-navbar-item tag="router-link" :to="{ path: '/caja' }" v-if="esAdmin || esCajero">
+                    <b-icon icon="cash-multiple"></b-icon>
+                    Caja
+                </b-navbar-item>
+
                 <b-navbar-item tag="router-link" :to="{ path: '/clientes' }" v-if="esAdmin || esCajero">
                     <b-icon icon="account-multiple"></b-icon>
                     Clientes
+                </b-navbar-item>
+
+                <b-navbar-item tag="router-link" :to="{ path: '/menu-qr' }" v-if="esAdmin">
+                    <b-icon icon="qrcode"></b-icon>
+                    Menú QR
                 </b-navbar-item>
 
                 <b-navbar-item tag="router-link" :to="{ path: '/configurar' }" v-if="esAdmin">

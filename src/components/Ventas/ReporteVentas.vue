@@ -126,7 +126,16 @@
         sortable
         v-slot="props"
       >
-        Mesa # {{ props.row.idMesa }}
+        {{ Number(props.row.idMesa) === 0 ? 'Para Llevar' : 'Mesa # ' + props.row.idMesa }}
+      </b-table-column>
+
+      <b-table-column
+        field="metodo_pago"
+        label="Método"
+        sortable
+        v-slot="props"
+      >
+        <span class="tag is-light">{{ props.row.metodo_pago || 'EFECTIVO' }}</span>
       </b-table-column>
 
       <b-table-column
@@ -228,12 +237,33 @@
           </p>
           <p class="control" v-if="props.row.factura">
             <b-button
+              type="is-danger"
+              size="is-small"
+              icon-left="file-pdf-box"
+              title="Imprimir / Guardar PDF (RIDE)"
+              @click="imprimirRide(props.row)"
+            >
+              RIDE
+            </b-button>
+          </p>
+          <p class="control" v-if="props.row.factura">
+            <b-button
               type="is-dark"
               size="is-small"
               icon-left="xml"
               @click="descargarXml(props.row.factura)"
             >
               XML
+            </b-button>
+          </p>
+          <p class="control" v-if="props.row.factura">
+            <b-button
+              type="is-success"
+              size="is-small"
+              icon-left="whatsapp"
+              title="Enviar Comprobante por WhatsApp"
+              @click="enviarWhatsApp(props.row)"
+            >
             </b-button>
           </p>
         </div>
@@ -247,6 +277,13 @@
       :logo="logo"
       v-if="mostrarTicket"
     ></ticket>
+    <ride-factura
+      @impreso="mostrarRide = false"
+      :venta="ventaRide"
+      :datosLocal="datos"
+      :logo="logo"
+      v-if="mostrarRide"
+    ></ride-factura>
     <b-loading
       :is-full-page="true"
       v-model="cargando"
@@ -258,10 +295,11 @@
 import HttpService from "../../Servicios/HttpService";
 import Utiles from "../../Servicios/Utiles";
 import Ticket from "./Ticket.vue";
+import RideFactura from "./RideFactura.vue";
 
 export default {
   name: "ReporteVentas",
-  components: { Ticket },
+  components: { Ticket, RideFactura },
 
   data: () => ({
     usuarios: [],
@@ -277,6 +315,8 @@ export default {
     ventasPorUsuario: [],
     totalVentas: 0,
     mostrarTicket: false,
+    mostrarRide: false,
+    ventaRide: null,
     isPaginated: true,
     isPaginationSimple: false,
     isPaginationRounded: true,
@@ -315,6 +355,29 @@ export default {
 
       this.insumosSeleccionados = venta.insumos;
       this.mostrarTicket = true;
+    },
+
+    imprimirRide(venta) {
+      this.ventaRide = venta;
+      this.mostrarRide = true;
+    },
+
+    enviarWhatsApp(venta) {
+      const telRaw = (venta.cliente_telefono || "").replace(/\D/g, "");
+      let tel = telRaw;
+      if (tel.startsWith("09") && tel.length === 10) {
+        tel = "593" + tel.substring(1);
+      }
+      const msg =
+        `Hola *${venta.cliente || "Cliente"}*, gracias por su visita a *${this.datos.nombre || "nuestro restaurante"}*.\n\n` +
+        `*Comprobante Electrónico:* ${venta.factura.numero_serie}\n` +
+        `*Total:* $${parseFloat(venta.total).toFixed(2)}\n` +
+        `*Estado SRI:* ${venta.factura.estado_sri}\n` +
+        `*Clave de Acceso:* ${venta.factura.clave_acceso}`;
+      const url = tel
+        ? `https://wa.me/${tel}?text=${encodeURIComponent(msg)}`
+        : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+      window.open(url, "_blank");
     },
 
     transmitirSri(venta) {

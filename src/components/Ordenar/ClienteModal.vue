@@ -1,17 +1,72 @@
 <template>
     <b-modal :active="true" has-modal-card @close="$emit('close')">
-        <div class="modal-card" style="width: 480px; max-width: 95vw;">
+        <div class="modal-card" style="width: 540px; max-width: 95vw;">
             <header class="modal-card-head">
-                <p class="modal-card-title">Cobrar Mesa #{{ mesa.mesa.idMesa }}</p>
+                <p class="modal-card-title">
+                    {{ Number(mesa.mesa.idMesa) === 0 ? 'Cobrar Pedido Para Llevar / Domicilio' : 'Cobrar Mesa #' + mesa.mesa.idMesa }}
+                </p>
                 <button type="button" class="delete" @click="$emit('close')"/>
             </header>
 
             <section class="modal-card-body">
-                <h3 class="title is-4">Total a pagar: ${{ mesa.mesa.total }}</h3>
-                
-                <b-field label="Cantidad con la que paga">
-                    <b-input type="number" step="0.01" v-model="pago" placeholder="Escribe la cantidad" min="1"></b-input>
+                <!-- División de Cuenta (Opcional) -->
+                <div class="box has-background-white-ter p-3 mb-4" v-if="mesa.insumos && mesa.insumos.length > 1">
+                    <b-checkbox v-model="dividirCuenta" type="is-info" @input="onToggleDividir">
+                        <strong>Dividir cuenta (Cobrar solo platillos seleccionados)</strong>
+                    </b-checkbox>
+                    <div v-if="dividirCuenta" class="mt-2">
+                        <p class="is-size-7 has-text-grey mb-2">Marca los ítems que va a pagar este cliente ahora:</p>
+                        <div v-for="(item, idx) in itemsSeleccionables" :key="idx" class="field is-grouped is-align-items-center mb-1">
+                            <b-checkbox v-model="item.seleccionado" type="is-success">
+                                {{ item.nombre }} (${{ parseFloat(item.precio).toFixed(2) }} c/u)
+                            </b-checkbox>
+                            <b-numberinput
+                                v-if="item.seleccionado && item.maxCantidad > 1"
+                                v-model="item.cantidadPagar"
+                                :min="1"
+                                :max="item.maxCantidad"
+                                size="is-small"
+                                controls-position="compact"
+                                style="width: 110px; margin-left: auto;"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <h3 class="title is-4 mb-3">
+                    Total a pagar: <span class="has-text-success">${{ totalAPagar.toFixed(2) }}</span>
+                </h3>
+
+                <!-- Método de Pago -->
+                <b-field label="Método de Pago">
+                    <div class="buttons has-addons">
+                        <b-button
+                            :type="metodoPago === 'EFECTIVO' ? 'is-success is-selected' : ''"
+                            icon-left="cash"
+                            @click="seleccionarMetodo('EFECTIVO')">
+                            Efectivo
+                        </b-button>
+                        <b-button
+                            :type="metodoPago === 'TRANSFERENCIA' ? 'is-info is-selected' : ''"
+                            icon-left="bank-transfer"
+                            @click="seleccionarMetodo('TRANSFERENCIA')">
+                            Transferencia / Deuna
+                        </b-button>
+                        <b-button
+                            :type="metodoPago === 'TARJETA' ? 'is-primary is-selected' : ''"
+                            icon-left="credit-card"
+                            @click="seleccionarMetodo('TARJETA')">
+                            Tarjeta
+                        </b-button>
+                    </div>
                 </b-field>
+
+                <b-field label="Cantidad con la que paga">
+                    <b-input type="number" step="0.01" v-model="pago" placeholder="Escribe la cantidad" min="0.01"></b-input>
+                </b-field>
+                <p v-if="pago && parseFloat(pago) >= totalAPagar" class="has-text-weight-bold has-text-info mb-2">
+                    Cambio a entregar: ${{ (parseFloat(pago) - totalAPagar).toFixed(2) }}
+                </p>
 
                 <hr>
 
@@ -113,6 +168,9 @@ export default {
     data() {
         return {
             pago: "",
+            metodoPago: 'EFECTIVO',
+            dividirCuenta: false,
+            itemsSeleccionables: [],
             tipoFactura: 'CONSUMIDOR_FINAL',
             busqueda: '',
             clientes: [],
@@ -128,7 +186,43 @@ export default {
             }
         }
     },
+    computed: {
+        totalAPagar() {
+            if (!this.dividirCuenta) {
+                return parseFloat(this.mesa.mesa.total || 0);
+            }
+            return this.itemsSeleccionables
+                .filter(i => i.seleccionado)
+                .reduce((acc, i) => acc + (parseFloat(i.precio) * parseInt(i.cantidadPagar || 1, 10)), 0);
+        }
+    },
+    mounted() {
+        this.inicializarItems();
+    },
     methods: {
+        inicializarItems() {
+            const lista = this.mesa.insumos || [];
+            this.itemsSeleccionables = lista.map(ins => ({
+                ...ins,
+                maxCantidad: parseInt(ins.cantidad, 10),
+                cantidadPagar: parseInt(ins.cantidad, 10),
+                seleccionado: true
+            }));
+        },
+        onToggleDividir(val) {
+            if (val) {
+                this.inicializarItems();
+            }
+            if (this.metodoPago !== 'EFECTIVO') {
+                this.pago = this.totalAPagar.toFixed(2);
+            }
+        },
+        seleccionarMetodo(metodo) {
+            this.metodoPago = metodo;
+            if (metodo === 'TRANSFERENCIA' || metodo === 'TARJETA') {
+                this.pago = this.totalAPagar.toFixed(2);
+            }
+        },
         buscarClientes(texto) {
             this.selectedCliente = null;
             if (this.timer) clearTimeout(this.timer);
@@ -157,7 +251,15 @@ export default {
             this.busqueda = '';
         },
         async confirmar() {
-            if (!this.pago || parseFloat(this.pago) < parseFloat(this.mesa.mesa.total)) {
+            if (this.totalAPagar <= 0) {
+                this.$buefy.toast.open({
+                    message: 'Selecciona al menos un platillo para cobrar',
+                    type: 'is-warning'
+                })
+                return
+            }
+
+            if (!this.pago || parseFloat(this.pago) < this.totalAPagar) {
                 this.$buefy.toast.open({
                     message: 'Escribe una cantidad igual o mayor al total a pagar',
                     type: 'is-warning'
@@ -206,13 +308,52 @@ export default {
 
             const nombreCliente = this.selectedCliente
                 ? `${this.selectedCliente.nombres} ${this.selectedCliente.apellidos}`
-                : 'CONSUMIDOR FINAL';
+                : (this.mesa.mesa.cliente || 'CONSUMIDOR FINAL');
+
+            let insumosCobrar = this.mesa.insumos;
+            let insumosRestantes = [];
+            let cobroParcial = false;
+
+            if (this.dividirCuenta) {
+                insumosCobrar = [];
+                this.itemsSeleccionables.forEach(item => {
+                    if (item.seleccionado) {
+                        insumosCobrar.push({
+                            id: item.id,
+                            codigo: item.codigo,
+                            nombre: item.nombre,
+                            precio: item.precio,
+                            cantidad: item.cantidadPagar,
+                            caracteristicas: item.caracteristicas || '',
+                            estado: item.estado || 'entregado'
+                        });
+                        const rest = item.maxCantidad - item.cantidadPagar;
+                        if (rest > 0) {
+                            insumosRestantes.push({
+                                ...item,
+                                cantidad: rest
+                            });
+                        }
+                    } else {
+                        insumosRestantes.push({
+                            ...item,
+                            cantidad: item.maxCantidad
+                        });
+                    }
+                });
+                cobroParcial = insumosRestantes.length > 0;
+            }
 
             this.$emit('confirm', {
                 pago: this.pago,
+                total_pagar: this.totalAPagar,
+                metodo_pago: this.metodoPago,
                 tipo_factura: this.tipoFactura,
                 cliente_id: this.selectedCliente ? this.selectedCliente.id : null,
-                cliente_nombre: nombreCliente
+                cliente_nombre: nombreCliente,
+                insumos_cobrar: insumosCobrar,
+                insumos_restantes: insumosRestantes,
+                cobro_parcial: cobroParcial
             })
             this.$emit('close')
         }

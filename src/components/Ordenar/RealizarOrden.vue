@@ -1,21 +1,36 @@
 <template>
     <section>
-        <p class="title is-1 has-text-weight-bold">
-            <b-icon
-                icon="order-bool-ascending-variant"
-                size="is-large"
-                type="is-primary">
-            </b-icon>
-            Realizar orden 
-        </p>
+        <div class="level mb-4">
+            <div class="level-left">
+                <p class="title is-1 has-text-weight-bold mb-0">
+                    <b-icon
+                        icon="order-bool-ascending-variant"
+                        size="is-large"
+                        type="is-primary">
+                    </b-icon>
+                    Realizar orden 
+                </p>
+            </div>
+            <div class="level-right">
+                <b-button
+                    type="is-warning"
+                    size="is-medium"
+                    icon-left="shopping"
+                    @click="nuevoPedidoParaLlevar"
+                >
+                    <strong>Pedido Para Llevar / Domicilio</strong>
+                </b-button>
+            </div>
+        </div>
 
         <div class="columns is-multiline">
             <div class="column" 
             v-for="mesa in mesas" 
             :key="mesa.mesa.idMesa">
                 
-                <div class="box">
-                    <p class="title is-2 has-text-grey">Mesa #{{ mesa.mesa.idMesa }}
+                <div class="box" :style="Number(mesa.mesa.idMesa) === 0 ? 'border: 2px solid #f59e0b;' : ''">
+                    <p class="title is-2 has-text-grey">
+                        {{ Number(mesa.mesa.idMesa) === 0 ? 'Para Llevar / Domicilio' : 'Mesa #' + mesa.mesa.idMesa }}
                         <span class="title is-1 has-text-weight-bold is-pulled-right" v-if="mesa.mesa.total">
                             ${{ parseFloat(mesa.mesa.total).toFixed(2) }}
                         </span>
@@ -97,6 +112,9 @@
                             </p>
                             <p class="control">
                                 <b-button type="is-dark" icon-left="printer" @click="imprimirComandaCocina(mesa)">Comanda Cocina</b-button>
+                            </p>
+                            <p class="control" v-if="Number(mesa.mesa.idMesa) > 0">
+                                <b-button type="is-primary is-light" icon-left="swap-horizontal" @click="abrirCambioMesa(mesa)">Cambiar Mesa</b-button>
                             </p>
                             <p class="control">
                                 <b-button type="is-warning" icon-left="check" v-if="checkedRows.length > 0" @click="marcarInsumosEntregados(mesa)">Marcar entrega</b-button>
@@ -287,25 +305,30 @@ export default ({
         // Handler called from ClienteModal when user confirms
         confirmarCobro(payloadCliente){
             const mesa = this.mesaActual
+            const totalCobrado = payloadCliente.total_pagar !== undefined ? payloadCliente.total_pagar : mesa.mesa.total
+            const insumosCobrar = payloadCliente.insumos_cobrar || mesa.insumos
             const payload = {
                 idMesa: mesa.mesa.idMesa,
                 cliente_id: payloadCliente.cliente_id,
                 cliente: payloadCliente.cliente_nombre || mesa.mesa.cliente,
                 tipo_factura: payloadCliente.tipo_factura,
-                total: mesa.mesa.total,
+                metodo_pago: payloadCliente.metodo_pago || 'EFECTIVO',
+                total: totalCobrado,
                 pagado: payloadCliente.pago,
                 idUsuario: mesa.mesa.idUsuario,
-                insumos: mesa.insumos,
+                insumos: insumosCobrar,
+                insumos_restantes: payloadCliente.insumos_restantes || [],
+                cobro_parcial: payloadCliente.cobro_parcial || false,
                 atiende: mesa.mesa.atiende
             }
             this.cargando = true
             HttpService.registrar(payload, "registrar_venta.php")
                 .then(registrado => {
                     if(registrado){
-                        const cambio = parseFloat(payloadCliente.pago - mesa.mesa.total).toFixed(2)
+                        const cambio = parseFloat(payloadCliente.pago - totalCobrado).toFixed(2)
                         this.$buefy.dialog.alert({
-                            title: 'Venta registrada',
-                            message: `Gracias por su compra, su cambio <b>$${cambio}</b>`,
+                            title: payload.cobro_parcial ? 'Cobro parcial registrado' : 'Venta registrada',
+                            message: `Gracias por su compra (${payload.metodo_pago}), su cambio <b>$${cambio}</b>`,
                             confirmText: 'OK'
                         })
                         this.imprimirComprobante(payload)
@@ -313,6 +336,75 @@ export default ({
                     }
                     this.cargando = false
                 })
+        },
+
+        nuevoPedidoParaLlevar(){
+            const existente = this.mesas.find(m => Number(m.mesa.idMesa) === 0)
+            if (existente) {
+                this.ocuparMesa(existente)
+                return
+            }
+            this.$router.push({
+                name: "Ordenar",
+                params: { id: 0, insumosEnLista: [], cliente: "PARA LLEVAR" },
+            })
+        },
+
+        abrirCambioMesa(mesa){
+            const libres = this.mesas
+                .filter(m => m.mesa.estado === 'libre' && Number(m.mesa.idMesa) > 0)
+                .map(m => m.mesa.idMesa)
+
+            if (libres.length === 0) {
+                this.$buefy.toast.open({
+                    message: 'No hay mesas libres disponibles para realizar el cambio',
+                    type: 'is-warning'
+                })
+                return
+            }
+
+            this.$buefy.dialog.prompt({
+                title: `Cambiar Mesa #${mesa.mesa.idMesa}`,
+                message: `Mesas libres disponibles: <b>${libres.join(', ')}</b>.<br>Escribe el número de la nueva mesa destino:`,
+                inputAttrs: {
+                    type: 'number',
+                    placeholder: `Ej. ${libres[0]}`,
+                    value: String(libres[0]),
+                    min: 1
+                },
+                trapFocus: true,
+                confirmText: 'Cambiar de Mesa',
+                cancelText: 'Cancelar',
+                onConfirm: (valor) => {
+                    const destino = parseInt(valor, 10)
+                    if (!destino || !libres.includes(destino)) {
+                        this.$buefy.toast.open({
+                            message: 'Selecciona un número de mesa libre válido',
+                            type: 'is-danger'
+                        })
+                        return
+                    }
+                    this.cargando = true
+                    HttpService.registrar({
+                        mesaOrigen: mesa.mesa.idMesa,
+                        mesaDestino: destino
+                    }, "cambiar_mesa.php").then(res => {
+                        this.cargando = false
+                        if (res && res.resultado) {
+                            this.$buefy.toast.open({
+                                message: `Pedido trasladado de la Mesa #${mesa.mesa.idMesa} a la Mesa #${destino}`,
+                                type: 'is-success'
+                            })
+                            this.crearMesas()
+                        } else {
+                            this.$buefy.toast.open({
+                                message: (res && res.error) ? res.error : 'No se pudo cambiar la mesa',
+                                type: 'is-danger'
+                            })
+                        }
+                    })
+                }
+            })
         },
 
         crearMesas(){

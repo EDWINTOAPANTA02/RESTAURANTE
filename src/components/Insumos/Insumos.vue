@@ -163,11 +163,35 @@
         ${{ props.row.precio }}
       </b-table-column>
 
+      <b-table-column field="stock" label="Stock / Disponibilidad" sortable v-slot="props">
+        <span class="tag is-light" v-if="props.row.stock === null || props.row.stock === undefined || props.row.stock === ''">
+          Ilimitado
+        </span>
+        <span class="tag is-danger" v-else-if="Number(props.row.stock) <= 0">
+          AGOTADO (0)
+        </span>
+        <span class="tag is-success" v-else>
+          {{ props.row.stock }} disp.
+        </span>
+      </b-table-column>
+
       <b-table-column field="acciones" label="Acciones" v-slot="props">
         <div class="field is-grouped">
           <p class="control">
             <b-button
+              :type="props.row.stock !== null && Number(props.row.stock) === 0 ? 'is-success is-light' : 'is-warning is-light'"
+              size="is-small"
+              :icon-left="props.row.stock !== null && Number(props.row.stock) === 0 ? 'restore' : 'cancel'"
+              @click="alternarAgotado(props.row)"
+              :title="props.row.stock !== null && Number(props.row.stock) === 0 ? 'Marcar como Disponible' : 'Marcar como Agotado'"
+            >
+              {{ props.row.stock !== null && Number(props.row.stock) === 0 ? 'Activar' : 'Agotar' }}
+            </b-button>
+          </p>
+          <p class="control">
+            <b-button
               type="is-danger"
+              size="is-small"
               icon-left="delete"
               @click="eliminar(props.row)"
             >
@@ -177,6 +201,7 @@
           <p class="control">
             <b-button
               type="is-info"
+              size="is-small"
               icon-left="pen"
               @click="editar(props.row.id)"
             >
@@ -264,6 +289,31 @@ export default {
       this.$router.push({
         name: "EditarInsumo",
         params: { id: idInsumo },
+      });
+    },
+
+    alternarAgotado(insumo) {
+      const estaAgotado = insumo.stock !== null && Number(insumo.stock) === 0;
+      const payload = {
+        ...insumo,
+        stock: estaAgotado ? null : 0,
+      };
+      // Obtener id numérico de categoría si viene nombre
+      HttpService.obtenerConDatos(insumo.id, "obtener_insumo_id.php").then((real) => {
+        if (real && real.id) {
+          real.stock = estaAgotado ? null : 0;
+          HttpService.registrar(real, "editar_insumo.php").then((ok) => {
+            if (ok) {
+              this.$buefy.toast.open({
+                message: estaAgotado
+                  ? `"${insumo.nombre}" marcado nuevamente como DISPONIBLE`
+                  : `"${insumo.nombre}" marcado como AGOTADO`,
+                type: estaAgotado ? "is-success" : "is-warning",
+              });
+              this.obtenerInsumos();
+            }
+          });
+        }
       });
     },
 

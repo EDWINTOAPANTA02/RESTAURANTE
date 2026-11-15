@@ -1,20 +1,23 @@
 <template>
   <div id="app">
-    <configuracion-inicial v-if="configurar"/>
-    <login @logeado="onLog" v-if="!logeado && !configurar"></login>
-    <cambiar-password v-if="cambiarPassword"></cambiar-password>
-    <div v-if="logeado && !cambiarPassword && !configurar">
-      <encabezado @cerrar="onClose"/> 
-      <div class="container main-content">
-        <router-view/>
-      </div> 
-      <pie /> 
-    </div>
-    <licencia-modal
-      :activa="licenciaExpirada"
-      :mensaje="mensajeExpiracion"
-      @renovada="onLicenciaRenovada"
-    />
+    <router-view v-if="esRutaPublica"/>
+    <template v-else>
+      <configuracion-inicial v-if="configurar"/>
+      <login @logeado="onLog" v-if="!logeado && !configurar"></login>
+      <cambiar-password v-if="cambiarPassword"></cambiar-password>
+      <div v-if="logeado && !cambiarPassword && !configurar">
+        <encabezado @cerrar="onClose"/> 
+        <div class="container main-content">
+          <router-view/>
+        </div> 
+        <pie /> 
+      </div>
+      <licencia-modal
+        :activa="licenciaExpirada"
+        :mensaje="mensajeExpiracion"
+        @renovada="onLicenciaRenovada"
+      />
+    </template>
   </div>
 </template>
 
@@ -39,6 +42,12 @@ export default {
     licenciaExpirada: false,
     mensajeExpiracion: ""
   }),
+
+  computed: {
+    esRutaPublica() {
+      return this.$route && this.$route.name === 'MenuDigital'
+    }
+  },
 
   mounted(){
     window.addEventListener('licencia-expirada', (e) => {
