@@ -51,8 +51,15 @@
                     <b-navbar-item tag="router-link" :to="{ path: '/insumos' }" class="dropdown-link">
                         <b-icon icon="food-fork-drink" size="is-small" class="nav-icon has-text-primary"></b-icon>
                         <div>
-                            <p class="has-text-weight-semibold">Insumos y Stock</p>
+                            <p class="has-text-weight-semibold">Insumos y Carta</p>
                             <p class="is-size-7 has-text-grey">Platillos, bebidas y disponibilidad</p>
+                        </div>
+                    </b-navbar-item>
+                    <b-navbar-item tag="router-link" :to="{ path: '/inventario' }" class="dropdown-link">
+                        <b-icon icon="warehouse" size="is-small" class="nav-icon has-text-warning-dark"></b-icon>
+                        <div>
+                            <p class="has-text-weight-semibold">Inventario y Compras</p>
+                            <p class="is-size-7 has-text-grey">Bodega (pescado, gaseosas), gastos y kardex</p>
                         </div>
                     </b-navbar-item>
                     <b-navbar-item tag="router-link" :to="{ path: '/categorias' }" class="dropdown-link">

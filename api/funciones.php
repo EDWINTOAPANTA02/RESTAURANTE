@@ -314,13 +314,48 @@ function registrarInsumosVenta($insumos, $idVenta, $empresa_id = 1, $bd = null)
 	$resultados = [];
 	$eid = getEmpresaId();
 	$empresa_id = ($empresa_id === 1) ? $eid : $empresa_id;
+	$uid = getUsuarioId();
 
 	foreach ($insumos as $insumo) {
 		$sentencia = $bd->prepare("INSERT INTO insumos_venta(idInsumo, precio, cantidad, idVenta, empresa_id) VALUES(?,?,?,?,?)");
 		$sentencia->execute([$insumo->id, $insumo->precio, $insumo->cantidad, $idVenta, $empresa_id]);
-		// Descontar stock si el insumo maneja stock numérico
+		// Descontar stock si el insumo maneja stock numérico directo
 		$stmtStock = $bd->prepare("UPDATE insumos SET stock = GREATEST(0, stock - ?) WHERE id = ? AND empresa_id = ? AND stock IS NOT NULL");
 		$stmtStock->execute([(int)$insumo->cantidad, $insumo->id, $empresa_id]);
+
+		// Descontar automáticamente en Bodega (inventario_items) si el plato/bebida tiene receta o vínculo de inventario
+		try {
+			$stmtRec = $bd->prepare("SELECT item_id, cantidad_descuento FROM inventario_recetas WHERE insumo_id = ? AND empresa_id = ?");
+			$stmtRec->execute([$insumo->id, $empresa_id]);
+			$recetas = $stmtRec->fetchAll();
+			foreach ($recetas as $rec) {
+				$descuentoTotal = floatval($insumo->cantidad) * floatval($rec->cantidad_descuento);
+				$bd->prepare("UPDATE inventario_items SET stock_actual = GREATEST(0, stock_actual - ?) WHERE id = ? AND empresa_id = ?")
+				   ->execute([$descuentoTotal, $rec->item_id, $empresa_id]);
+
+				$nombrePlato = isset($insumo->nombre) ? $insumo->nombre : ("Insumo #" . $insumo->id);
+				$bd->prepare("INSERT INTO inventario_movimientos (empresa_id, item_id, tipo_movimiento, concepto, cantidad, costo_total, proveedor, pagado_desde_caja, usuario_id, fecha) VALUES (?, ?, 'VENTA', ?, ?, 0, '', 0, ?, ?)")
+				   ->execute([$empresa_id, $rec->item_id, "Venta #" . $idVenta . " (" . $insumo->cantidad . "x " . $nombrePlato . ")", -$descuentoTotal, $uid, date('Y-m-d H:i:s')]);
+
+				// Sincronizar el stock disponible de todos los platos que compartan este mismo ingrediente (ej. Pescado)
+				$stmtItem = $bd->prepare("SELECT stock_actual FROM inventario_items WHERE id = ? AND empresa_id = ?");
+				$stmtItem->execute([$rec->item_id, $empresa_id]);
+				$itemActual = $stmtItem->fetchObject();
+				if ($itemActual) {
+					$stmtOtros = $bd->prepare("SELECT insumo_id, cantidad_descuento FROM inventario_recetas WHERE item_id = ? AND empresa_id = ?");
+					$stmtOtros->execute([$rec->item_id, $empresa_id]);
+					foreach ($stmtOtros->fetchAll() as $otro) {
+						$factor = floatval($otro->cantidad_descuento) > 0 ? floatval($otro->cantidad_descuento) : 1;
+						$disp = max(0, floor(floatval($itemActual->stock_actual) / $factor));
+						$bd->prepare("UPDATE insumos SET stock = ?, disponible = ? WHERE id = ? AND empresa_id = ?")
+						   ->execute([$disp, ($disp > 0 ? 1 : 0), $otro->insumo_id, $empresa_id]);
+					}
+				}
+			}
+		} catch (\Throwable $eInv) {
+			// Si las tablas de inventario aún no existen, continuar sin interrumpir la venta
+		}
+
 		if ($sentencia)
 			array_push($resultados, $sentencia);
 	}

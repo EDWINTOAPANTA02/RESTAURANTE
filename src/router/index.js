@@ -154,6 +154,12 @@ const router = new Router({
       meta: { roles: ADMIN_CAJERO }
     },
     {
+      path: '/inventario',
+      name: 'Inventario',
+      component: () => import('../components/Inventario/Inventario.vue'),
+      meta: { roles: ADMIN_CAJERO }
+    },
+    {
       path: '/menu-qr',
       name: 'GeneradorQr',
       component: () => import('../components/Menu/GeneradorQr.vue'),
