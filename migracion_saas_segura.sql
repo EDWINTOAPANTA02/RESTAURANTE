@@ -333,6 +333,18 @@ CREATE TABLE IF NOT EXISTS suscripciones (
     INDEX idx_empresa (empresa_id)
 );
 
+CREATE TABLE IF NOT EXISTS pagos_empresa (
+    id                      BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    empresa_id              BIGINT UNSIGNED NOT NULL,
+    monto                   DECIMAL(10,2) NOT NULL,
+    metodo_pago             VARCHAR(50) NOT NULL DEFAULT 'EFECTIVO',
+    mes_pagado              VARCHAR(20) NOT NULL,
+    fecha_vencimiento_nueva DATE NOT NULL,
+    notas                   TEXT,
+    fecha_pago              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_empresa_pago (empresa_id)
+);
+
 -- ── AJUSTES DE USUARIOS (SUPERADMIN Y CÉDULA) ────────────────
 CALL add_column_if_not_exists('botanero_ventas', 'usuarios', 'cedula', 'VARCHAR(20) NULL AFTER nombre');
 ALTER TABLE usuarios MODIFY COLUMN rol ENUM('SUPERADMIN','ADMINISTRADOR','MESERO','CAJERO') NOT NULL DEFAULT 'MESERO';

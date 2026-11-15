@@ -83,7 +83,8 @@
           <b-field label="Estado de la Cuenta">
             <b-select v-model="empresaEditada.estado" expanded>
               <option value="ACTIVO">Activo</option>
-              <option value="INACTIVO">Inactivo (Suspendido)</option>
+              <option value="SUSPENDIDO">Suspendido</option>
+              <option value="CANCELADO">Cancelado</option>
             </b-select>
           </b-field>
           <b-field label="Plan Actual">
@@ -92,6 +93,9 @@
               <option value="PRO">Pro</option>
               <option value="PREMIUM">Premium</option>
             </b-select>
+          </b-field>
+          <b-field label="Fecha de Vencimiento (YYYY-MM-DD)">
+            <b-input v-model="empresaEditada.fecha_vencimiento" placeholder="Ej: 2026-10-01"></b-input>
           </b-field>
         </section>
         <footer class="modal-card-foot">

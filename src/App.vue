@@ -10,6 +10,11 @@
       </div> 
       <pie /> 
     </div>
+    <licencia-modal
+      :activa="licenciaExpirada"
+      :mensaje="mensajeExpiracion"
+      @renovada="onLicenciaRenovada"
+    />
   </div>
 </template>
 
@@ -19,20 +24,29 @@ import CambiarPassword from './components/Usuarios/CambiarPassword.vue'
 import ConfiguracionInicial from './components/Configuracion/ConfiguracionInicial.vue'
 import Encabezado from './components/Encabezado.vue'
 import Pie from './components/Pie.vue'
+import LicenciaModal from './components/Suscripcion/LicenciaModal.vue'
 import HttpService from './Servicios/HttpService'
 
 export default {
-  components: { Encabezado, Pie, Login, CambiarPassword, ConfiguracionInicial },
+  components: { Encabezado, Pie, Login, CambiarPassword, ConfiguracionInicial, LicenciaModal },
   name: 'App',
 
   data: ()=> ({
     logeado: false,
     datos: "",
     cambiarPassword: false,
-    configurar: false
+    configurar: false,
+    licenciaExpirada: false,
+    mensajeExpiracion: ""
   }),
 
   mounted(){
+    window.addEventListener('licencia-expirada', (e) => {
+      if (localStorage.getItem('rol') !== 'SUPERADMIN') {
+        this.mensajeExpiracion = (e.detail && e.detail.error) ? e.detail.error : 'Tu suscripción ha caducado.'
+        this.licenciaExpirada = true
+      }
+    })
     this.verificarInformacion()
     let logeado = this.verificarSesion()
     if(logeado) {
@@ -84,6 +98,12 @@ export default {
 
     onClose(logeado){
       this.logeado = logeado
+      this.licenciaExpirada = false
+    },
+
+    onLicenciaRenovada(){
+      this.licenciaExpirada = false
+      window.location.reload()
     }
   }
 }

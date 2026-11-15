@@ -16,9 +16,10 @@ if (!$datos)
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $bd = conectarBaseDatos();
     try {
-        $stmt = $bd->prepare("INSERT INTO empresas (razon_social, ruc, direccion_matriz, correo, telefono, estado, plan) VALUES (?,?,?,?,?,?,?)");
+        $stmt = $bd->prepare("INSERT INTO empresas (razon_social, ruc, direccion_matriz, correo, telefono, estado, plan, fecha_vencimiento) VALUES (?,?,?,?,?,?,?,?)");
         $direccion = isset($datos->direccion_matriz) ? $datos->direccion_matriz : "No especificado";
-        $exito = $stmt->execute([$datos->razon_social, $datos->ruc, $direccion, $datos->correo, $datos->telefono, "ACTIVO", $datos->plan]);
+        $vencimientoInicial = date('Y-m-d', strtotime('+1 month'));
+        $exito = $stmt->execute([$datos->razon_social, $datos->ruc, $direccion, $datos->correo, $datos->telefono, "ACTIVO", $datos->plan, $vencimientoInicial]);
         if ($exito) {
             $empresaId = $bd->lastInsertId();
             if (!empty($datos->admin_correo) && !empty($datos->admin_password)) {
@@ -60,15 +61,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 }
 if ($_SERVER["REQUEST_METHOD"] === "PUT") {
     $bd = conectarBaseDatos();
-    $stmt = $bd->prepare("UPDATE empresas SET razon_social = ?, ruc = ?, direccion_matriz = ?, correo = ?, telefono = ?, estado = ?, plan = ? WHERE id = ?");
+    $fechaVenc = !empty($datos->fecha_vencimiento) ? $datos->fecha_vencimiento : null;
+    $stmt = $bd->prepare("UPDATE empresas SET razon_social = ?, ruc = ?, direccion_matriz = ?, correo = ?, telefono = ?, estado = ?, plan = ?, fecha_vencimiento = ? WHERE id = ?");
     $exito = $stmt->execute([
         $datos->razon_social,
         $datos->ruc,
-        $datos->direccion_matriz,
+        $datos->direccion_matriz ?? 'No especificado',
         $datos->correo,
         $datos->telefono,
         $datos->estado,
         $datos->plan,
+        $fechaVenc,
         $datos->id
     ]);
     echo json_encode(["resultado" => $exito]);

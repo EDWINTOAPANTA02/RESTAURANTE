@@ -47,17 +47,20 @@
             </b-button>
         </div>
 
+        <licencia-modal :modo-panel="true"></licencia-modal>
+
         <b-loading :is-full-page="true" v-model="cargando" :can-cancel="false"></b-loading>
 
     </section>
 </template>
 <script>
 import DatosConfiguracion from './DatosConfiguracion.vue'
+import LicenciaModal from '../Suscripcion/LicenciaModal.vue'
 import HttpService from '../../Servicios/HttpService'
 
 export default ({
     name: "Configurar",
-    components: { DatosConfiguracion },
+    components: { DatosConfiguracion, LicenciaModal },
 
     data: ()=>({
         cargando: false,

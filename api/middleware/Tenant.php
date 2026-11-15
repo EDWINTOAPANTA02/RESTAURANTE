@@ -33,10 +33,11 @@ function requireTenant(): object
         exit;
     }
 
-    if ($empresa->estado !== 'ACTIVO') {
+    if ($empresa->estado !== 'ACTIVO' && $usuario->rol !== 'SUPERADMIN') {
         http_response_code(403);
         echo json_encode([
-            'error' => 'Tu empresa está ' . $empresa->estado . '. Contacta al administrador del sistema.'
+            'error' => 'Tu cuenta está ' . $empresa->estado . '. Renueva tu licencia para continuar.',
+            'expirado' => true
         ]);
         exit;
     }

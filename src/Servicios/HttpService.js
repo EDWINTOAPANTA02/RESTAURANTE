@@ -2,6 +2,12 @@ const RUTA_GLOBAL = process.env.NODE_ENV === 'production'
     ? './api/'
     : 'http://localhost/botanero_ventas/api/'
 
+function notificarSiExpirado(res) {
+    if (res && res.expirado) {
+        window.dispatchEvent(new CustomEvent('licencia-expirada', { detail: res }))
+    }
+}
+
 const HttpService = {
     async registrar(datos, ruta) {
         try {
@@ -11,6 +17,7 @@ const HttpService = {
                 credentials: 'include'
             });
             let resultado = await respuesta.json()
+            notificarSiExpirado(resultado)
             return resultado
         } catch (e) {
             console.error("Error en HTTP registrar:", e)
@@ -26,6 +33,7 @@ const HttpService = {
                 credentials: 'include'
             });
             let resultado = await respuesta.json()
+            notificarSiExpirado(resultado)
             if (resultado && resultado.error) {
                 console.error("Error en obtenerConDatos:", resultado.error)
                 return null
@@ -44,6 +52,7 @@ const HttpService = {
                 credentials: 'include'
             })
             let datos = await respuesta.json()
+            notificarSiExpirado(datos)
             if (datos && datos.error) {
                 console.error("Error en obtener:", datos.error)
                 return []
@@ -63,6 +72,7 @@ const HttpService = {
                 credentials: 'include'
             });
             let resultado = await respuesta.json()
+            notificarSiExpirado(resultado)
             if (resultado && resultado.error) {
                 console.error("Error en eliminar:", resultado.error)
                 return false
@@ -82,6 +92,7 @@ const HttpService = {
                 credentials: 'include'
             });
             let resultado = await respuesta.json()
+            notificarSiExpirado(resultado)
             return resultado
         } catch (e) {
             console.error("Error en HTTP actualizar:", e)
