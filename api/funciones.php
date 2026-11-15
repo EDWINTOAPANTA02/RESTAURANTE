@@ -830,15 +830,28 @@ function obtenerInformacionLocal()
 
 function obtenerImagen($imagen)
 {
-	$imagen = str_replace('data:image/png;base64,', '', $imagen);
-	$imagen = str_replace('data:image/jpeg;base64,', '', $imagen);
+	if (!is_dir(DIRECTORIO)) {
+		@mkdir(DIRECTORIO, 0777, true);
+	}
+	$imagen = preg_replace('#^data:image/\w+;base64,#i', '', $imagen);
 	$imagen = str_replace(' ', '+', $imagen);
 	$data = base64_decode($imagen);
-	$file = DIRECTORIO . uniqid() . '.png';
+	$nombreArchivo = uniqid('plato_') . '.png';
+	$file = DIRECTORIO . $nombreArchivo;
 
+	file_put_contents($file, $data);
+	return '/fotos/' . $nombreArchivo;
+}
 
-	$insertar = file_put_contents($file, $data);
-	return $file;
+function asegurarColumnaImagenInsumos($bd)
+{
+	try {
+		$col = $bd->query("SHOW COLUMNS FROM insumos LIKE 'imagen'")->fetchObject();
+		if (!$col) {
+			$bd->exec("ALTER TABLE insumos ADD COLUMN imagen VARCHAR(255) NULL DEFAULT NULL");
+		}
+	} catch (\Throwable $e) {
+	}
 }
 
 function eliminarInsumo($idInsumo)
@@ -852,10 +865,16 @@ function editarInsumo($insumo)
 {
 	$bd = conectarBaseDatos();
 	$eid = getEmpresaId();
-	$stock = (isset($insumo->stock) && $insumo->stock !== '' && $insumo->stock !== null) ? (int)$insumo->stock : null;
-	$sentencia = $bd->prepare("UPDATE insumos SET tipo = ?, codigo = ?, nombre = ?, descripcion = ?, categoria = ?, precio = ?, stock = ? WHERE id = ? AND empresa_id = ?");
-	return $sentencia->execute([$insumo->tipo, $insumo->codigo, $insumo->nombre, $insumo->descripcion, $insumo->categoria, $insumo->precio, $stock, $insumo->id, $eid]);
+	asegurarColumnaImagenInsumos($bd);
 
+	$stock = (isset($insumo->stock) && $insumo->stock !== '' && $insumo->stock !== null) ? (int)$insumo->stock : null;
+	$imagenRuta = isset($insumo->imagen) ? $insumo->imagen : null;
+	if (!empty($insumo->imagen_base64)) {
+		$imagenRuta = obtenerImagen($insumo->imagen_base64);
+	}
+
+	$sentencia = $bd->prepare("UPDATE insumos SET tipo = ?, codigo = ?, nombre = ?, descripcion = ?, categoria = ?, precio = ?, stock = ?, imagen = ? WHERE id = ? AND empresa_id = ?");
+	return $sentencia->execute([$insumo->tipo, $insumo->codigo, $insumo->nombre, $insumo->descripcion, $insumo->categoria, $insumo->precio, $stock, $imagenRuta, $insumo->id, $eid]);
 }
 
 function obtenerInsumoPorId($idInsumo)
@@ -915,8 +934,13 @@ function registrarInsumo($insumo)
 		}
 
 		$stock = (isset($insumo->stock) && $insumo->stock !== '' && $insumo->stock !== null) ? (int)$insumo->stock : null;
-		$sentencia = $bd->prepare("INSERT INTO insumos (empresa_id, codigo, nombre, descripcion, precio, tipo, categoria, stock) VALUES (?,?,?,?,?,?,?,?)");
-		$exito = $sentencia->execute([$eid, $insumo->codigo, $insumo->nombre, $insumo->descripcion, $insumo->precio, $insumo->tipo, $insumo->categoria, $stock]);
+		asegurarColumnaImagenInsumos($bd);
+		$imagenRuta = isset($insumo->imagen) ? $insumo->imagen : null;
+		if (!empty($insumo->imagen_base64)) {
+			$imagenRuta = obtenerImagen($insumo->imagen_base64);
+		}
+		$sentencia = $bd->prepare("INSERT INTO insumos (empresa_id, codigo, nombre, descripcion, precio, tipo, categoria, stock, imagen) VALUES (?,?,?,?,?,?,?,?,?)");
+		$exito = $sentencia->execute([$eid, $insumo->codigo, $insumo->nombre, $insumo->descripcion, $insumo->precio, $insumo->tipo, $insumo->categoria, $stock, $imagenRuta]);
 		return ["resultado" => $exito];
 	}
 	catch (Exception $e) {

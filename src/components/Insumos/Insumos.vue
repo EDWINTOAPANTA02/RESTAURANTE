@@ -103,16 +103,24 @@
       aria-page-label="Page"
       aria-current-label="Current page"
     >
-      <b-table-column field="icono" label="" v-slot="props">
-        <b-icon
-          icon="noodles"
-          size="is-small"
-          v-if="props.row.tipo === 'PLATILLO'"
-        >
-        </b-icon>
+      <b-table-column field="icono" label="Foto" width="75" v-slot="props">
+        <img
+          v-if="props.row.imagen"
+          :src="urlImagen(props.row.imagen)"
+          :alt="props.row.nombre"
+          style="width: 48px; height: 48px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; display: block;"
+        />
+        <template v-else>
+          <b-icon
+            icon="noodles"
+            size="is-small"
+            v-if="props.row.tipo === 'PLATILLO'"
+          >
+          </b-icon>
 
-        <b-icon icon="cup" size="is-small" v-if="props.row.tipo === 'BEBIDA'">
-        </b-icon>
+          <b-icon icon="cup" size="is-small" v-if="props.row.tipo === 'BEBIDA'">
+          </b-icon>
+        </template>
       </b-table-column>
 
       <b-table-column field="tipo" label="Tipo" sortable v-slot="props">
@@ -220,6 +228,7 @@
 </template>
 <script>
 import HttpService from "../../Servicios/HttpService";
+import Utiles from "../../Servicios/Utiles";
 
 export default {
   name: "Insumos",
@@ -250,6 +259,9 @@ export default {
   },
 
   methods: {
+    urlImagen(ruta) {
+      return Utiles.generarUrlImagen(ruta);
+    },
     busquedaAvanzada() {
       if (this.filtros.tipo === "BEBIDA" || this.filtros.tipo === "PLATILLO") {
         this.obtenerCategorias();

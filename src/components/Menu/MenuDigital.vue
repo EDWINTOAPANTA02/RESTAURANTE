@@ -13,7 +13,7 @@
       </div>
     </div>
 
-    <div class="container px-3">
+    <div class="container px-3 pb-6">
       <!-- Filtro rápido por categorías -->
       <div class="buttons is-centered mb-4">
         <b-button
@@ -46,28 +46,40 @@
         ></b-input>
       </b-field>
 
-      <!-- Lista de platillos y bebidas -->
+      <!-- Lista de platillos y bebidas con foto referencial -->
       <div class="columns is-multiline">
         <div
           class="column is-6-tablet is-4-desktop"
           v-for="item in insumosFiltrados"
           :key="item.id"
         >
-          <div class="box p-4" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+          <div class="box p-0" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; border-radius: 14px;">
             <div>
-              <div class="is-flex is-justify-content-space-between is-align-items-flex-start">
-                <span class="tag is-info is-light is-size-7 mb-2">{{ item.categoria_nombre }}</span>
-                <span class="title is-4 has-text-primary mb-0">${{ parseFloat(item.precio).toFixed(2) }}</span>
+              <!-- Imagen Referencial del Platillo / Bebida -->
+              <div v-if="item.imagen" style="width: 100%; height: 185px; overflow: hidden; background: #f8fafc;">
+                <img
+                  :src="obtenerUrlFoto(item.imagen)"
+                  :alt="item.nombre"
+                  style="width: 100%; height: 100%; object-fit: cover; display: block;"
+                />
               </div>
-              <h3 class="title is-5 mb-1">{{ item.nombre }}</h3>
-              <p class="has-text-grey is-size-6 mb-2">{{ item.descripcion }}</p>
+
+              <div class="p-4">
+                <div class="is-flex is-justify-content-space-between is-align-items-flex-start">
+                  <span class="tag is-info is-light is-size-7 mb-2">{{ item.categoria_nombre }}</span>
+                  <span class="title is-4 has-text-primary mb-0">${{ parseFloat(item.precio).toFixed(2) }}</span>
+                </div>
+                <h3 class="title is-5 mb-1">{{ item.nombre }}</h3>
+                <p class="has-text-grey is-size-6 mb-2">{{ item.descripcion }}</p>
+              </div>
             </div>
-            <div class="is-flex is-justify-content-space-between is-align-items-center mt-2">
+
+            <div class="px-4 pb-4 is-flex is-justify-content-space-between is-align-items-center">
               <span class="tag is-light is-size-7">
                 <b-icon :icon="item.tipo === 'BEBIDA' ? 'cup' : 'food'" size="is-small" class="mr-1"></b-icon>
                 {{ item.tipo }}
               </span>
-              <span class="tag is-warning is-light" v-if="item.stock !== null && item.stock !== undefined">
+              <span class="tag is-warning is-light" v-if="item.stock !== null && item.stock !== undefined && item.stock !== ''">
                 Disponibles: {{ item.stock }}
               </span>
             </div>
@@ -128,6 +140,9 @@ export default {
     this.cargarMenu();
   },
   methods: {
+    obtenerUrlFoto(ruta) {
+      return Utiles.generarUrlImagen(ruta);
+    },
     cargarMenu() {
       this.cargando = true;
       HttpService.obtener(`publico/menu.php?empresa=${this.empresaId}`).then((res) => {

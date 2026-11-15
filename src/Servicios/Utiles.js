@@ -4,10 +4,19 @@ const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "
 
 const Utiles = {
 	generarUrlImagen(imagen) {
+		if (!imagen) return ''
+		if (
+			imagen.indexOf('http://') === 0 ||
+			imagen.indexOf('https://') === 0 ||
+			imagen.indexOf('data:image') === 0
+		) {
+			return imagen
+		}
+		const limpia = imagen.replace(/^\.?\//, '/')
 		const base = process.env.NODE_ENV === 'production'
 			? './api'
 			: 'http://localhost/botanero_ventas/api'
-		return base + imagen
+		return base + limpia
 	},
 	generarGrafica(array, contenedor, grafica, id) {
 		this.resetearGrafica(contenedor, grafica, id)

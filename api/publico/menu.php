@@ -11,11 +11,28 @@ if ($empresaId <= 0) {
 
 $bd = conectarBaseDatos();
 
+// Asegurar columna imagen y disponible en insumos
+try {
+    $colImg = $bd->query("SHOW COLUMNS FROM insumos LIKE 'imagen'")->fetchObject();
+    if (!$colImg) {
+        $bd->exec("ALTER TABLE insumos ADD COLUMN imagen VARCHAR(255) NULL DEFAULT NULL");
+    }
+    $colDisp = $bd->query("SHOW COLUMNS FROM insumos LIKE 'disponible'")->fetchObject();
+    if (!$colDisp) {
+        $bd->exec("ALTER TABLE insumos ADD COLUMN disponible TINYINT(1) NOT NULL DEFAULT 1");
+    }
+} catch (\Throwable $e) {
+}
+
 $stmtNegocio = $bd->prepare("
-    SELECT i.nombre, i.telefono, i.direccion, i.correo, i.logo, i.mensaje_pie, e.razon_social
+    SELECT COALESCE(NULLIF(i.nombre, ''), e.razon_social) AS nombre,
+           COALESCE(NULLIF(i.telefono, ''), e.telefono) AS telefono,
+           COALESCE(NULLIF(i.direccion, ''), e.direccion) AS direccion,
+           COALESCE(NULLIF(i.correo, ''), e.correo) AS correo,
+           i.logo, i.mensaje_pie, e.razon_social
     FROM empresas e
     LEFT JOIN informacion_negocio i ON i.empresa_id = e.id
-    WHERE e.id = ? AND e.estado = 'ACTIVO'
+    WHERE e.id = ? AND e.estado IN ('ACTIVO', 'ACTIVA')
     LIMIT 1
 ");
 $stmtNegocio->execute([$empresaId]);
@@ -32,11 +49,13 @@ $stmtCats->execute([$empresaId]);
 $categorias = $stmtCats->fetchAll();
 
 $stmtInsumos = $bd->prepare("
-    SELECT i.id, i.codigo, i.nombre, i.descripcion, i.precio, i.tipo, i.categoria, i.stock,
+    SELECT i.id, i.codigo, i.nombre, i.descripcion, i.precio, i.tipo, i.categoria, i.stock, i.imagen,
            IFNULL(c.nombre, 'General') AS categoria_nombre
     FROM insumos i
     LEFT JOIN categorias c ON c.id = i.categoria
-    WHERE i.empresa_id = ? AND (i.stock IS NULL OR i.stock > 0)
+    WHERE i.empresa_id = ?
+      AND (i.disponible IS NULL OR i.disponible = 1)
+      AND (i.stock IS NULL OR i.stock > 0)
     ORDER BY c.nombre ASC, i.nombre ASC
 ");
 $stmtInsumos->execute([$empresaId]);
